@@ -28,6 +28,9 @@ const translations = defineTranslations({
       idle: 'Play when idle',
       off: 'Silent',
     },
+    login: {
+      toggle: 'Menu music',
+    },
     account: {
       title: 'Menu Music',
       enabled: 'Play menu music',
