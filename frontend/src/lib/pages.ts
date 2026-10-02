@@ -1,11 +1,27 @@
-import { DEFAULT_PAGE, type MenuMusicConfig, type PageKey, type TrackConfig } from './schemas.ts';
+import { DEFAULT_PAGE, isCustomPage, type MenuMusicConfig, type PageKey, type TrackConfig } from './schemas.ts';
+
+/** The URLs each built-in page covers, shown as the subtitle on the configuration page. */
+export const BUILTIN_PAGE_PATHS: Record<PageKey, string> = {
+  default: '*',
+  login: '/auth/login/*',
+  register: '/auth/register',
+  password_reset: '/auth/forgot-password, /auth/reset-password, /auth/verify-email',
+  server_list: '/, /grouped, /all',
+  account: '/account/*',
+  server: '/server/*',
+  admin: '/admin/*',
+};
+
+function normalizePath(pathname: string): string {
+  return pathname.replace(/\/+$/, '') || '/';
+}
 
 /**
- * Maps a panel URL path onto the page key a track can be configured for.
+ * Maps a panel URL path onto the built-in page a track can be configured for.
  * Anything that is not recognised falls back to the default track.
  */
 export function pageFromPath(pathname: string): PageKey {
-  const path = pathname.replace(/\/+$/, '') || '/';
+  const path = normalizePath(pathname);
 
   if (path === '/auth/login' || path.startsWith('/auth/login/')) return 'login';
   if (path === '/auth/register' || path.startsWith('/auth/register/')) return 'register';
@@ -26,8 +42,53 @@ export function pageFromPath(pathname: string): PageKey {
   return DEFAULT_PAGE;
 }
 
-/** The track that applies to a page, which is the default track unless the page has its own. */
-export function resolveTrack(config: MenuMusicConfig, page: PageKey): TrackConfig | null {
+const patternCache = new Map<string, RegExp>();
+
+/**
+ * Turns a custom page pattern into a regex. `*` matches anything (including `/`),
+ * and a trailing `/*` also matches the path itself, so `/admin/*` matches `/admin` too.
+ */
+function patternToRegex(pattern: string): RegExp {
+  const cached = patternCache.get(pattern);
+  if (cached) return cached;
+
+  const toRegex = (part: string) =>
+    part
+      .split('*')
+      .map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*');
+
+  const normalized = normalizePath(pattern);
+  const regex = normalized.endsWith('/*')
+    ? new RegExp(`^${toRegex(normalized.slice(0, -2))}(?:/.*)?$`)
+    : new RegExp(`^${toRegex(normalized)}$`);
+
+  patternCache.set(pattern, regex);
+  return regex;
+}
+
+export function pathMatchesPattern(pathname: string, pattern: string): boolean {
+  return patternToRegex(pattern).test(normalizePath(pathname));
+}
+
+/** The more literal characters a pattern has, the more specific it is. */
+function specificity(pattern: string): number {
+  return pattern.replaceAll('*', '').length;
+}
+
+/**
+ * The track that applies to a URL: the most specific matching custom page,
+ * then the built-in page's own track, then the default track.
+ */
+export function resolveTrack(config: MenuMusicConfig, pathname: string): TrackConfig | null {
+  let custom: TrackConfig | null = null;
+  for (const track of config.tracks) {
+    if (!isCustomPage(track.page) || !track.path || !pathMatchesPattern(pathname, track.path)) continue;
+    if (!custom || specificity(track.path) > specificity(custom.path)) custom = track;
+  }
+  if (custom) return custom;
+
+  const page = pageFromPath(pathname);
   return (
     config.tracks.find((track) => track.page === page) ??
     config.tracks.find((track) => track.page === DEFAULT_PAGE) ??

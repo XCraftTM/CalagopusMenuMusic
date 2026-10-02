@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
-import { pageFromPath, resolveTrack } from '../lib/pages.ts';
+import { resolveTrack } from '../lib/pages.ts';
 import { player } from '../lib/player.ts';
 import { usePreview } from '../lib/preview.ts';
 import { useIdle } from '../lib/useIdle.ts';
@@ -17,7 +17,7 @@ export default function MenuMusic() {
   const { data: config } = useMenuMusicConfig();
   const preview = usePreview();
 
-  const track = config ? resolveTrack(config, pageFromPath(pathname)) : null;
+  const track = config ? resolveTrack(config, pathname) : null;
   const playable = Boolean(config?.enabled && track && track.url && track.mode !== 'off');
 
   const { muted, volume } = useMusicPrefs(config?.defaultVolume ?? 50);

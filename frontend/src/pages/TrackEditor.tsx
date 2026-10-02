@@ -1,4 +1,4 @@
-import { faPlay, faRotateLeft, faStop, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faPlay, faRotateLeft, faStop, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { FileButton, Slider, Text } from '@mantine/core';
 import { useState } from 'react';
@@ -6,18 +6,20 @@ import { httpErrorToHuman } from '@/api/axios.ts';
 import Button from '@/elements/buttons/Button.tsx';
 import Card from '@/elements/data-display/Card.tsx';
 import Autocomplete from '@/elements/input/Autocomplete.tsx';
+import TextInput from '@/elements/input/TextInput.tsx';
 import Group from '@/elements/layout/Group.tsx';
 import SegmentedControl from '@/elements/layout/SegmentedControl.tsx';
 import Stack from '@/elements/layout/Stack.tsx';
 import { useToast } from '@/providers/ToastProvider.tsx';
 import uploadTrack from '../api/uploadTrack.ts';
 import { setPreview, usePreview } from '../lib/preview.ts';
-import { DEFAULT_PAGE, type PlayMode, playModeSchema, type TrackConfig } from '../lib/schemas.ts';
+import { DEFAULT_PAGE, isCustomPage, type PlayMode, playModeSchema, type TrackConfig } from '../lib/schemas.ts';
 import { useExtTranslations } from '../translations.ts';
+import PageHeading from './PageHeading.tsx';
 
 interface Props {
   track: TrackConfig;
-  urlError?: string;
+  errors: Partial<Record<'name' | 'path' | 'url', string>>;
   assetUrls: string[];
   canUpload: boolean;
   onChange: (track: TrackConfig) => void;
@@ -25,7 +27,7 @@ interface Props {
   onUploaded: () => void;
 }
 
-export default function TrackEditor({ track, urlError, assetUrls, canUpload, onChange, onRemove, onUploaded }: Props) {
+export default function TrackEditor({ track, errors, assetUrls, canUpload, onChange, onRemove, onUploaded }: Props) {
   const { t: tExt } = useExtTranslations();
   const { addToast } = useToast();
   const preview = usePreview();
@@ -33,6 +35,7 @@ export default function TrackEditor({ track, urlError, assetUrls, canUpload, onC
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const isDefault = track.page === DEFAULT_PAGE;
+  const isCustom = isCustomPage(track.page);
   const previewing = preview !== null && preview.url === track.url;
 
   const doUpload = (file: File | null) => {
@@ -54,27 +57,45 @@ export default function TrackEditor({ track, urlError, assetUrls, canUpload, onC
   };
 
   return (
-    <Card withBorder radius='md' p='md'>
+    <Card withBorder radius='md' p='md' className='@container h-full'>
       <Stack gap='sm'>
         <Group justify='space-between' align='flex-start' wrap='nowrap'>
-          <div>
-            <Text fw={600}>{tExt(`pages.${track.page}`, {})}</Text>
-            <Text size='xs' c='dimmed'>
-              {tExt(`pageDescriptions.${track.page}`, {})}
-            </Text>
-          </div>
+          <PageHeading page={track.page} name={track.name} path={track.path} />
           {!isDefault && (
             <Button
               size='xs'
               variant='subtle'
-              color='gray'
-              leftSection={<FontAwesomeIcon icon={faRotateLeft} />}
+              color={isCustom ? 'red' : 'gray'}
+              className='shrink-0'
+              leftSection={<FontAwesomeIcon icon={isCustom ? faTrash : faRotateLeft} />}
               onClick={onRemove}
             >
-              {tExt('config.tracks.remove', {})}
+              {isCustom ? tExt('config.tracks.delete', {}) : tExt('config.tracks.remove', {})}
             </Button>
           )}
         </Group>
+
+        {isCustom && (
+          <div className='grid grid-cols-1 @lg:grid-cols-2 gap-2'>
+            <TextInput
+              label={tExt('config.custom.name', {})}
+              placeholder={tExt('config.custom.namePlaceholder', {})}
+              value={track.name}
+              onChange={(e) => onChange({ ...track, name: e.currentTarget.value })}
+              error={errors.name}
+              maxLength={64}
+            />
+            <TextInput
+              label={tExt('config.custom.path', {})}
+              placeholder={tExt('config.custom.pathPlaceholder', {})}
+              value={track.path}
+              onChange={(e) => onChange({ ...track, path: e.currentTarget.value })}
+              error={errors.path}
+              maxLength={256}
+              classNames={{ input: 'font-mono' }}
+            />
+          </div>
+        )}
 
         <SegmentedControl
           fullWidth
@@ -86,16 +107,16 @@ export default function TrackEditor({ track, urlError, assetUrls, canUpload, onC
 
         {track.mode !== 'off' && (
           <>
-            <Group align='flex-end' gap='xs' wrap='nowrap'>
+            <Group align='flex-end' gap='xs'>
               <Autocomplete
-                className='flex-1'
+                className='flex-1 min-w-56'
                 label={tExt('config.tracks.url', {})}
                 placeholder={tExt('config.tracks.urlPlaceholder', {})}
                 description={tExt('config.tracks.urlDescription', {})}
                 data={assetUrls}
                 value={track.url}
                 onChange={(url) => onChange({ ...track, url })}
-                error={urlError}
+                error={errors.url}
                 limit={50}
                 maxDropdownHeight={240}
               />

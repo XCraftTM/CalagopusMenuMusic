@@ -21,6 +21,12 @@ pub const PAGES: &[&str] = &[
     "admin",
 ];
 
+/// Page keys of admin-defined pages start with this, followed by a short random id.
+pub const CUSTOM_PAGE_PREFIX: &str = "custom-";
+pub const MAX_CUSTOM_PAGES: usize = 50;
+pub const MAX_CUSTOM_NAME_LENGTH: usize = 64;
+pub const MAX_CUSTOM_PATH_LENGTH: usize = 256;
+
 pub const MAX_URL_LENGTH: usize = 2048;
 pub const MAX_IDLE_TIMEOUT_SECONDS: u32 = 24 * 60 * 60;
 pub const MAX_FADE_DURATION_MS: u32 = 30_000;
@@ -39,8 +45,14 @@ pub enum PlayMode {
 
 #[derive(ToSchema, Serialize, Deserialize, Clone)]
 pub struct TrackConfig {
-    /// One of [`DEFAULT_PAGE`] or [`PAGES`].
+    /// One of [`DEFAULT_PAGE`], [`PAGES`] or a custom page (`custom-<id>`).
     pub page: CompactString,
+    /// Display name of a custom page, empty for built-in pages.
+    #[serde(default)]
+    pub name: CompactString,
+    /// URL path pattern of a custom page (`*` matches anything), empty for built-in pages.
+    #[serde(default)]
+    pub path: CompactString,
     pub mode: PlayMode,
     /// Absolute `http(s)://` URL or a panel relative `/path`, empty means silence.
     pub url: CompactString,
@@ -52,6 +64,8 @@ impl TrackConfig {
     pub fn default_track() -> Self {
         Self {
             page: DEFAULT_PAGE.into(),
+            name: CompactString::default(),
+            path: CompactString::default(),
             mode: PlayMode::Always,
             url: CompactString::default(),
             volume: 100,
@@ -95,8 +109,32 @@ impl ExtensionSettingsData {
             errors.push("tracks: the default track is missing".to_string());
         }
 
+        if self
+            .tracks
+            .iter()
+            .filter(|t| is_custom_page(&t.page))
+            .count()
+            > MAX_CUSTOM_PAGES
+        {
+            errors.push(format!(
+                "tracks: at most {MAX_CUSTOM_PAGES} custom pages are allowed"
+            ));
+        }
+
         for (i, track) in self.tracks.iter().enumerate() {
-            if track.page != DEFAULT_PAGE && !PAGES.contains(&track.page.as_str()) {
+            if is_custom_page(&track.page) {
+                let name = track.name.trim();
+                if name.is_empty() || name.chars().count() > MAX_CUSTOM_NAME_LENGTH {
+                    errors.push(format!(
+                        "tracks.{i}.name: must be between 1 and {MAX_CUSTOM_NAME_LENGTH} characters"
+                    ));
+                }
+                if !is_valid_path_pattern(&track.path) {
+                    errors.push(format!(
+                        "tracks.{i}.path: must start with / and contain no spaces (at most {MAX_CUSTOM_PATH_LENGTH} characters)"
+                    ));
+                }
+            } else if !is_builtin_page(&track.page) {
                 errors.push(format!("tracks.{i}.page: unknown page `{}`", track.page));
             }
             if self.tracks[..i].iter().any(|t| t.page == track.page) {
@@ -143,7 +181,14 @@ impl ExtensionSettingsData {
         let mut tracks: Vec<TrackConfig> = Vec::with_capacity(self.tracks.len() + 1);
 
         for mut track in std::mem::take(&mut self.tracks) {
-            let known = track.page == DEFAULT_PAGE || PAGES.contains(&track.page.as_str());
+            let known = if is_custom_page(&track.page) {
+                track.name = track.name.trim().into();
+                !track.name.is_empty() && is_valid_path_pattern(&track.path)
+            } else {
+                track.name = CompactString::default();
+                track.path = CompactString::default();
+                is_builtin_page(&track.page)
+            };
             if !known || tracks.iter().any(|t| t.page == track.page) {
                 continue;
             }
@@ -166,6 +211,25 @@ impl ExtensionSettingsData {
         self.fade_duration_ms = self.fade_duration_ms.min(MAX_FADE_DURATION_MS);
         self.default_volume = self.default_volume.min(100);
     }
+}
+
+fn is_builtin_page(page: &str) -> bool {
+    page == DEFAULT_PAGE || PAGES.contains(&page)
+}
+
+fn is_custom_page(page: &str) -> bool {
+    page.strip_prefix(CUSTOM_PAGE_PREFIX).is_some_and(|id| {
+        (1..=32).contains(&id.len())
+            && id
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    })
+}
+
+fn is_valid_path_pattern(path: &str) -> bool {
+    path.starts_with('/')
+        && path.len() <= MAX_CUSTOM_PATH_LENGTH
+        && !path.chars().any(|c| c.is_whitespace() || c.is_control())
 }
 
 fn is_allowed_url(url: &str) -> bool {
@@ -240,6 +304,8 @@ mod tests {
     fn track(page: &str, url: &str) -> TrackConfig {
         TrackConfig {
             page: page.into(),
+            name: CompactString::default(),
+            path: CompactString::default(),
             mode: PlayMode::Always,
             url: url.into(),
             volume: 100,
@@ -284,6 +350,74 @@ mod tests {
             ..Default::default()
         };
         assert!(data.validate().is_empty());
+    }
+
+    fn custom(id: &str, name: &str, path: &str) -> TrackConfig {
+        TrackConfig {
+            name: name.into(),
+            path: path.into(),
+            ..track(&format!("{CUSTOM_PAGE_PREFIX}{id}"), "/x.mp3")
+        }
+    }
+
+    #[test]
+    fn validate_custom_pages() {
+        let ok = ExtensionSettingsData {
+            tracks: vec![
+                track(DEFAULT_PAGE, ""),
+                custom("abc123", "Server Files", "/server/*/files*"),
+            ],
+            ..Default::default()
+        };
+        assert!(ok.validate().is_empty());
+
+        let bad = ExtensionSettingsData {
+            tracks: vec![
+                track(DEFAULT_PAGE, ""),
+                custom("abc", "  ", "/a"),
+                custom("def", "No slash", "server/*"),
+                custom("ghi", "Spaces", "/a b"),
+                custom("UPPER", "Bad id", "/a"),
+            ],
+            ..Default::default()
+        };
+        let errors = bad.validate();
+        assert!(errors.iter().any(|e| e.starts_with("tracks.1.name")));
+        assert!(errors.iter().any(|e| e.starts_with("tracks.2.path")));
+        assert!(errors.iter().any(|e| e.starts_with("tracks.3.path")));
+        assert!(errors.iter().any(|e| e.starts_with("tracks.4.page")));
+    }
+
+    #[test]
+    fn deserializes_tracks_saved_before_custom_pages() {
+        let tracks: Vec<TrackConfig> = serde_json::from_str(
+            r#"[{"page":"default","mode":"always","url":"/a.mp3","volume":80}]"#,
+        )
+        .unwrap();
+        assert_eq!(tracks[0].name, "");
+        assert_eq!(tracks[0].path, "");
+    }
+
+    #[test]
+    fn normalize_keeps_custom_pages_and_clears_builtin_paths() {
+        let mut login = track("login", "/l.mp3");
+        login.path = "/should/be/cleared".into();
+
+        let mut data = ExtensionSettingsData {
+            tracks: vec![
+                track(DEFAULT_PAGE, ""),
+                login,
+                custom("abc", "  Files  ", "/server/*/files*"),
+                custom("bad", "", "/x"),
+            ],
+            ..Default::default()
+        };
+        data.normalize();
+
+        let pages: Vec<&str> = data.tracks.iter().map(|t| t.page.as_str()).collect();
+        assert_eq!(pages, vec![DEFAULT_PAGE, "login", "custom-abc"]);
+        assert_eq!(data.tracks[1].path, "");
+        assert_eq!(data.tracks[2].name, "Files");
     }
 
     #[test]

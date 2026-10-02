@@ -4,12 +4,13 @@ A [Calagopus Panel](https://calagopus.com) extension (`dev.xcrafttm.menumusic`) 
 
 ## Features
 
-- **A track per page.** Login, Register, Password Reset & Email Verification, Server List, Account Settings, Server Pages (console, files, settings, allocations and every other server sub-page), and the Admin Area.
+- **A track per page.** Login, Register, Password Reset & Email Verification, Server List, Account Settings, Server Pages (console, files, settings, allocations and every other server sub-page), and the Admin Area. Each page shows the URLs it covers, e.g. `/auth/login/*`.
+- **Custom pages by URL.** Add your own pages with a name and a URL pattern where `*` is a wildcard, e.g. `/server/*/files*` for every server's file manager. A matching custom page wins over a built-in one, and the most specific pattern wins when several match.
 - **A Default track.** It plays on every page that has no track of its own.
 - **Three playback modes for every track.** *Always play*, *Play when idle* (starts after the user has been inactive for a set time and fades out on the next input), and *Silent*.
 - **Direct links or panel assets.** The track URL field autocompletes audio files from the panel's **Admin → Assets** tab, the same way the Application icon field does. You can also paste any direct `https://…` audio link, or use **Upload** to send a file straight into `assets/menu-music/`.
 - **Preview and per-track volume** on the configuration page.
-- **Crossfades between pages.** When you move to a page with a different track, the old track fades out while the new one fades in, over the configured crossfade duration. When two pages use the same track, it keeps playing across navigation instead of restarting. Music also fades in and out when it starts, stops, is muted, or reaches the idle delay.
+- **Crossfades between pages.** When you move to a page with a different track, the old track fades out while the new one fades in, over the configured crossfade duration. When two pages use the same track, it keeps playing across navigation instead of restarting. Looping uses the same crossfade: when a track reaches its end, it fades into its own beginning instead of jumping back. Tracks shorter than two crossfades use the browser's normal seamless loop. Music also fades in and out when it starts, stops, is muted, or reaches the idle delay.
 - **User controls.** Each user gets a **Menu Music** card on their **Account** page with an on/off switch and a volume slider. These settings sync to the account and are remembered on the login screen too.
 - **Autoplay handling.** Browsers block audio until the visitor interacts with the page. Nothing is shown on screen for this: the music simply starts with whatever the current page should play on the first click, tap or key press anywhere.
 
@@ -17,7 +18,9 @@ A [Calagopus Panel](https://calagopus.com) extension (`dev.xcrafttm.menumusic`) 
 
 | Left: **Configured** | Right: **Using Default Track** |
 | --- | --- |
-| The **Default** track is always first. Below it are the pages you gave their own track, each with playback mode, URL (asset autocomplete, upload, preview) and volume. **Use default** moves a page back to the right. | Every page without its own track. These pages play the Default track. **Add** moves a page to the left so you can configure it. |
+| The **Default** track is always first. Below it are the pages you gave their own track, each with playback mode, URL (asset autocomplete, upload, preview) and volume. They are shown in two columns when there is room. **Use default** moves a built-in page back to the right, and **Remove** deletes a custom page. | Every built-in page without its own track. These pages play the Default track. **Add** moves a page to the left so you can configure it. Below the list, **Add Custom Page** creates a page from a name and a URL pattern. |
+
+**Save** sits at the top of the page.
 
 General options:
 
