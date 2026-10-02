@@ -43,7 +43,7 @@ Requires Panel `>=1.2.4`.
 
 `.github/workflows/build.yml` runs on every push, on pull requests, and manually from the **Actions** tab:
 
-- **Package** builds the `.c7s.zip` and uploads it as a workflow artifact. Open the run, then download `dev_xcrafttm_menumusic.c7s.zip` under **Artifacts**. GitHub wraps it in an extra `.zip`, so unpack that first.
+- **Package** builds the `.c7s.zip` and uploads it as a workflow artifact. Open the run, then download `dev_xcrafttm_menumusic.c7s.zip` under **Artifacts**. The download is the installable archive itself, so no extra unzipping is needed.
 - **Verify** installs the extension into a fresh checkout of [calagopus/panel](https://github.com/calagopus/panel). It runs the TypeScript type-check, biome, the full frontend build, rustfmt, clippy and the tests. A manual run lets you pick the panel branch or tag to check against.
 - **Release:** pushing a tag like `v1.0.0` attaches the archive to a GitHub release once both jobs pass. The tag must match `version` in `Cargo.toml`.
 
