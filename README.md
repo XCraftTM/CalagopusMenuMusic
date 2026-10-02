@@ -37,7 +37,7 @@ General options:
 
 2. Install `dev_xcrafttm_menumusic.c7s.zip` on a panel running the `:heavy` image. You can upload it in **Admin → Extensions**, or use `panel-rs extensions add`. See [Installing Extensions](https://calagopus.com/docs/panel/extensions/installing-extensions).
 
-Requires Panel `>=1.2.4`.
+Requires Panel `>=1.2.3`.
 
 ### GitHub Actions
 

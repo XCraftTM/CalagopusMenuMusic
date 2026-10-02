@@ -8,15 +8,14 @@ on:
   workflow_dispatch:
     inputs:
       panel_ref:
-        description: Calagopus panel branch or tag to verify against
-        default: main
+        description: Extra panel branch or tag to verify against, instead of the newest release (e.g. main)
+        default: ''
 
 permissions:
   contents: read
 
 env:
   IDENTIFIER: dev_xcrafttm_menumusic
-  PANEL_REF: ${{ inputs.panel_ref || 'main' }}
 
 jobs:
   package:
@@ -50,17 +49,55 @@ jobs:
           if-no-files-found: error
 
   verify:
-    name: Verify against panel (${{ inputs.panel_ref || 'main' }})
+    name: Verify against ${{ matrix.target }} panel
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # minimum: the oldest release Metadata.toml's panel_version allows
+        # latest: the newest published release (or the manually given panel_ref)
+        target: [minimum, latest]
     steps:
       - uses: actions/checkout@v5
         with:
           path: extension
 
+      - name: Resolve panel ref
+        id: panel
+        env:
+          TARGET: ${{ matrix.target }}
+          OVERRIDE: ${{ inputs.panel_ref }}
+        run: |
+          releases=$(git ls-remote --tags --refs https://github.com/calagopus/panel 'release-*' \
+            | sed 's|.*refs/tags/release-||' | sort -V)
+
+          if [ "$TARGET" = latest ]; then
+            if [ -n "$OVERRIDE" ]; then
+              ref="$OVERRIDE"
+            else
+              ref="release-$(echo "$releases" | tail -n 1)"
+            fi
+          else
+            requirement=$(python3 -c "import tomllib; print(tomllib.load(open('extension/Metadata.toml', 'rb'))['panel_version'])")
+            minimum=$(echo "$requirement" | sed -n 's/^>=\s*\([0-9.]*\)$/\1/p')
+            if [ -z "$minimum" ]; then
+              echo "::error::panel_version \"$requirement\" is not of the form >=X.Y.Z"
+              exit 1
+            fi
+            if ! echo "$releases" | grep -qx "$minimum"; then
+              echo "::error::panel_version $requirement names a panel version that has not been released"
+              exit 1
+            fi
+            ref="release-$minimum"
+          fi
+
+          echo "verifying against $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v5
         with:
           repository: calagopus/panel
-          ref: ${{ env.PANEL_REF }}
+          ref: ${{ steps.panel.outputs.ref }}
           path: panel
 
       # mirrors what `panel-rs extensions add` sets up for an installed extension
@@ -120,7 +157,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: panel
-          key: ${{ env.PANEL_REF }}
+          key: ${{ steps.panel.outputs.ref }}
 
       - name: Check Rust formatting
         working-directory: panel
