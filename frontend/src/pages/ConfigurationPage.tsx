@@ -4,7 +4,7 @@ import { Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useQueryClient } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { httpErrorToHuman } from '@/api/axios.ts';
 import Button from '@/elements/buttons/Button.tsx';
 import Card from '@/elements/data-display/Card.tsx';
@@ -14,6 +14,7 @@ import Switch from '@/elements/input/Switch.tsx';
 import TextInput from '@/elements/input/TextInput.tsx';
 import Group from '@/elements/layout/Group.tsx';
 import Stack from '@/elements/layout/Stack.tsx';
+import { useKeyboardShortcut } from '@/plugins/quick-actions/useKeyboardShortcuts.ts';
 import { useResource } from '@/plugins/resource/useResource.ts';
 import { useAdminCan } from '@/plugins/usePermissions.ts';
 import { useToast } from '@/providers/ToastProvider.tsx';
@@ -96,6 +97,18 @@ export default function ConfigurationPage() {
     }
   }, [settings.data]);
 
+  // the panel-wide save shortcut (Ctrl/Cmd+S unless the user rebound it), same as the panel's own forms
+  const formRef = useRef<HTMLFormElement>(null);
+  const canSaveRef = useRef(false);
+  canSaveRef.current = Boolean(settings.data) && !loading;
+  useKeyboardShortcut(
+    's',
+    () => {
+      if (canSaveRef.current) formRef.current?.requestSubmit();
+    },
+    { id: 'general.save' },
+  );
+
   // never leave a preview playing after leaving the page
   useEffect(() => () => setPreview(null), []);
 
@@ -149,7 +162,7 @@ export default function ConfigurationPage() {
   };
 
   return (
-    <form onSubmit={form.onSubmit(doSave)}>
+    <form ref={formRef} onSubmit={form.onSubmit(doSave)}>
       <Stack>
         <Group justify='flex-end'>
           <Button

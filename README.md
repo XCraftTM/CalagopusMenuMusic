@@ -20,7 +20,7 @@ A [Calagopus Panel](https://calagopus.com) extension (`dev.xcrafttm.menumusic`) 
 | --- | --- |
 | The **Default** track is always first. Below it are the pages you gave their own track, each with playback mode, URL (asset autocomplete, upload, preview) and volume. They are shown in two columns when there is room. **Use default** moves a built-in page back to the right, and **Remove** deletes a custom page. | Every built-in page without its own track. These pages play the Default track. **Add** moves a page to the left so you can configure it. Below the list, **Add Custom Page** creates a page from a name and a URL pattern. |
 
-**Save** sits at the top of the page.
+**Save** sits at the top of the page. Like the panel's own settings pages, **Ctrl+S** (**Cmd+S** on macOS) saves too, or whatever the user bound *Save* to under **Account → Shortcuts**.
 
 General options:
 
