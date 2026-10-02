@@ -39,6 +39,14 @@ General options:
 
 Requires Panel `>=1.2.4`.
 
+### GitHub Actions
+
+`.github/workflows/build.yml` runs on every push, on pull requests, and manually from the **Actions** tab:
+
+- **Package** builds the `.c7s.zip` and uploads it as a workflow artifact. Open the run, then download `dev_xcrafttm_menumusic.c7s.zip` under **Artifacts**. GitHub wraps it in an extra `.zip`, so unpack that first.
+- **Verify** installs the extension into a fresh checkout of [calagopus/panel](https://github.com/calagopus/panel). It runs the TypeScript type-check, biome, the full frontend build, rustfmt, clippy and the tests. A manual run lets you pick the panel branch or tag to check against.
+- **Release:** pushing a tag like `v1.0.0` attaches the archive to a GitHub release once both jobs pass. The tag must match `version` in `Cargo.toml`.
+
 ### Developing
 
 Install the archive into a [development environment](https://calagopus.com/docs/panel/extensions/dev-environment) with `panel-rs extensions add dist/dev_xcrafttm_menumusic.c7s.zip`. That command creates the links and `frontend/tsconfig.json` the panel build needs. Then run the [pre-export checks](https://calagopus.com/docs/panel/extensions/getting-your-extension-ready): `cargo clippy`, `cargo test -p dev_xcrafttm_menumusic`, `pnpm biome:fix-unsafe` and `pnpm build:ci`.

@@ -1,0 +1,155 @@
+name: Build Extension
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      panel_ref:
+        description: Calagopus panel branch or tag to verify against
+        default: main
+
+permissions:
+  contents: read
+
+env:
+  IDENTIFIER: dev_xcrafttm_menumusic
+  PANEL_REF: ${{ inputs.panel_ref || 'main' }}
+
+jobs:
+  package:
+    name: Package .c7s.zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Check tag matches Cargo.toml version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('Cargo.toml', 'rb'))['package']['version'])")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $version"
+            exit 1
+          fi
+
+      - name: Build archive
+        run: python3 scripts/package.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IDENTIFIER }}.c7s.zip
+          path: dist/${{ env.IDENTIFIER }}.c7s.zip
+          if-no-files-found: error
+
+  verify:
+    name: Verify against panel (${{ inputs.panel_ref || 'main' }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: extension
+
+      - uses: actions/checkout@v5
+        with:
+          repository: calagopus/panel
+          ref: ${{ env.PANEL_REF }}
+          path: panel
+
+      # mirrors what `panel-rs extensions add` sets up for an installed extension
+      - name: Install extension into panel checkout
+        working-directory: panel
+        run: |
+          ext="backend-extensions/$IDENTIFIER"
+          mkdir -p "$ext"
+          cp -r ../extension/Cargo.toml ../extension/Metadata.toml ../extension/src ../extension/frontend "$ext/"
+          ln -sfn "../../$ext/frontend" "frontend/extensions/$IDENTIFIER"
+          ln -sfn ../frontend/node_modules backend-extensions/node_modules
+          cat > "$ext/frontend/tsconfig.json" <<'EOF'
+          {
+            "compilerOptions": {
+              "jsx": "react-jsx",
+              "moduleResolution": "bundler",
+              "module": "esnext",
+              "target": "esnext",
+              "allowImportingTsExtensions": true,
+              "noEmit": true,
+              "paths": { "@/*": ["../../../frontend/src/*"] },
+              "types": ["../../../frontend/src/vite-env.d.ts"]
+            },
+            "include": ["src"]
+          }
+          EOF
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install frontend dependencies
+        working-directory: panel/frontend
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Type-check frontend
+        working-directory: panel/frontend
+        run: pnpm typecheck
+
+      - name: Lint frontend (biome)
+        working-directory: panel/frontend
+        run: pnpm exec biome check --css-parse-tailwind-directives=true "extensions/$IDENTIFIER/src"
+
+      # also required before the backend compiles (shared/build.rs embeds frontend/dist)
+      - name: Build frontend
+        working-directory: panel/frontend
+        run: pnpm build
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: panel
+          key: ${{ env.PANEL_REF }}
+
+      - name: Check Rust formatting
+        working-directory: panel
+        run: rustfmt --edition 2024 --check "backend-extensions/$IDENTIFIER/src/lib.rs"
+
+      - name: Clippy
+        working-directory: panel
+        env:
+          SQLX_OFFLINE: 'true'
+        run: cargo clippy -p "$IDENTIFIER" -- -D warnings
+
+      - name: Tests
+        working-directory: panel
+        env:
+          SQLX_OFFLINE: 'true'
+        run: cargo test -p "$IDENTIFIER"
+
+  release:
+    name: Attach to GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [package, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ env.IDENTIFIER }}.c7s.zip
+          path: dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ env.IDENTIFIER }}.c7s.zip
+          generate_release_notes: true
