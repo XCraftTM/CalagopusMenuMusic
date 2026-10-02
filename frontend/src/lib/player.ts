@@ -1,44 +1,86 @@
-export interface PlayerState {
-  /** Playback was refused by the browser's autoplay policy and waits for a user gesture. */
-  blocked: boolean;
-  /** Something is audible (or fading in) right now. */
-  playing: boolean;
-  /** The URL the player is trying to play, `null` while silent. */
-  url: string | null;
+// any of these counts as the "first interaction" browsers require before audio may play
+const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'mousedown', 'click', 'keydown', 'touchend'] as const;
+
+/** Equal-power curve, keeps the perceived loudness steady while two tracks overlap. */
+function ease(progress: number, rising: boolean): number {
+  return rising ? Math.sin((progress * Math.PI) / 2) : 1 - Math.cos((progress * Math.PI) / 2);
 }
 
-const UNLOCK_EVENTS = ['pointerdown', 'keydown', 'touchend'] as const;
+/** One looping audio element with its own volume fade. */
+class Deck {
+  public readonly audio: HTMLAudioElement;
+  private fadeTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    this.audio = new Audio();
+    this.audio.loop = true;
+    this.audio.preload = 'auto';
+    this.audio.volume = 0;
+    this.audio.addEventListener('error', () => {
+      if (this.audio.src) console.warn('[menu music] failed to load track', this.audio.src, this.audio.error);
+    });
+  }
+
+  public get url(): string {
+    return this.audio.src;
+  }
+
+  /** Fades to `volume`, `done` only runs if the fade is not interrupted by another one. */
+  public fadeTo(volume: number, fullDuration: number, done?: () => void) {
+    this.cancelFade();
+
+    const from = this.audio.volume;
+    // a small volume tweak should not take as long as a full fade in
+    const duration = fullDuration * Math.min(1, Math.abs(volume - from) / Math.max(volume, from, 0.01));
+
+    if (duration < 16 || from === volume) {
+      this.audio.volume = volume;
+      done?.();
+      return;
+    }
+
+    const rising = volume > from;
+    const start = performance.now();
+
+    this.fadeTimer = setInterval(() => {
+      const progress = Math.min(1, (performance.now() - start) / duration);
+      this.audio.volume = Math.min(1, Math.max(0, from + (volume - from) * ease(progress, rising)));
+
+      if (progress >= 1) {
+        this.cancelFade();
+        done?.();
+      }
+    }, 20);
+  }
+
+  public fadeOutAndPause(duration: number) {
+    this.fadeTo(0, duration, () => this.audio.pause());
+  }
+
+  public cancelFade() {
+    if (this.fadeTimer) {
+      clearInterval(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+  }
+}
 
 /**
- * A single looping audio element with volume fades.
+ * Plays the menu music. Callers only describe what *should* be heard via `setTarget`.
  *
- * Callers only describe what *should* be heard via `setTarget`; the player
- * takes care of fading out the old track, switching sources, fading in, and
- * retrying after the first user interaction when autoplay is blocked.
+ * Two decks alternate so a new track fades in while the previous one fades out (crossfade).
+ * Pausing keeps the position, so a track that comes back (e.g. idle music) resumes where it was.
+ * If the browser blocks autoplay, playback starts on the first click or key press anywhere.
  */
 class MenuMusicPlayer {
-  private audio: HTMLAudioElement | null = null;
+  private decks: [Deck, Deck] | null = null;
+  private active = 0;
+
   private targetUrl: string | null = null;
   private targetVolume = 0;
   private fadeMs = 1500;
 
-  private fadeFrame: ReturnType<typeof setInterval> | null = null;
-  private switchToken = 0;
   private unlockListening = false;
-
-  private state: PlayerState = { blocked: false, playing: false, url: null };
-  private listeners = new Set<(state: PlayerState) => void>();
-
-  public getState(): PlayerState {
-    return this.state;
-  }
-
-  public subscribe(listener: (state: PlayerState) => void): () => void {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  }
 
   public setFadeDuration(ms: number) {
     this.fadeMs = Math.max(0, ms);
@@ -53,175 +95,91 @@ class MenuMusicPlayer {
     const clampedVolume = Math.min(1, Math.max(0, volume));
 
     if (resolvedUrl === this.targetUrl && clampedVolume === this.targetVolume) return;
-
-    const urlChanged = resolvedUrl !== this.targetUrl;
     this.targetUrl = resolvedUrl;
     this.targetVolume = clampedVolume;
 
+    const [current, other] = this.getDecks();
+
     if (!resolvedUrl || clampedVolume === 0) {
-      this.fadeOutAndPause();
+      current.fadeOutAndPause(this.fadeMs);
+      other.fadeOutAndPause(this.fadeMs);
       return;
     }
 
-    if (urlChanged && this.audio && this.audio.src !== resolvedUrl) {
-      this.switchTrack(resolvedUrl);
+    if (current.url === resolvedUrl) {
+      other.fadeOutAndPause(this.fadeMs);
+      this.play(current);
       return;
     }
 
-    this.ensurePlaying(resolvedUrl);
+    // crossfade: the old track fades out while the new one fades in on the other deck
+    current.fadeOutAndPause(this.fadeMs);
+    this.active = 1 - this.active;
+
+    if (other.url !== resolvedUrl) {
+      other.cancelFade();
+      other.audio.pause();
+      other.audio.volume = 0;
+      other.audio.src = resolvedUrl;
+    }
+    this.play(other);
   }
 
-  /** Retry playback right now, must be called from a user gesture to bypass autoplay blocking. */
+  /** Start whatever should be playing right now, call it from a user gesture to bypass autoplay blocking. */
   public resume() {
     if (this.targetUrl && this.targetVolume > 0) {
-      this.ensurePlaying(this.targetUrl);
+      this.play(this.getDecks()[0]);
     }
   }
 
   public stop() {
-    this.targetUrl = null;
-    this.targetVolume = 0;
-    this.fadeOutAndPause();
+    this.setTarget(null, 0);
   }
 
-  private getAudio(): HTMLAudioElement {
-    if (!this.audio) {
-      const audio = new Audio();
-      audio.loop = true;
-      audio.preload = 'auto';
-      audio.volume = 0;
-      audio.addEventListener('error', () => {
-        if (!audio.src) return;
-        console.warn('[menu music] failed to load track', audio.src, audio.error);
-        this.update({ playing: false });
-      });
-
-      this.audio = audio;
-    }
-
-    return this.audio;
+  /** `[active, inactive]` */
+  private getDecks(): [Deck, Deck] {
+    if (!this.decks) this.decks = [new Deck(), new Deck()];
+    return this.active === 0 ? [this.decks[0], this.decks[1]] : [this.decks[1], this.decks[0]];
   }
 
-  private update(state: Partial<PlayerState>) {
-    const next = { ...this.state, ...state };
-    if (next.blocked === this.state.blocked && next.playing === this.state.playing && next.url === this.state.url) {
+  private play(deck: Deck) {
+    if (!deck.audio.paused) {
+      deck.fadeTo(this.targetVolume, this.fadeMs);
       return;
     }
 
-    this.state = next;
-    for (const listener of this.listeners) listener(next);
-  }
-
-  private fadeTo(volume: number, duration: number, done?: () => void) {
-    const audio = this.getAudio();
-
-    if (this.fadeFrame) {
-      clearInterval(this.fadeFrame);
-      this.fadeFrame = null;
-    }
-
-    const from = audio.volume;
-    if (duration <= 0 || from === volume) {
-      audio.volume = volume;
-      done?.();
-      return;
-    }
-
-    // scale the fade by the distance so a short volume tweak is not as slow as a full fade
-    const total = duration * Math.min(1, Math.abs(volume - from) / Math.max(this.targetVolume, from, 0.01));
-    const start = performance.now();
-
-    this.fadeFrame = setInterval(() => {
-      const progress = Math.min(1, (performance.now() - start) / Math.max(total, 1));
-      audio.volume = Math.min(1, Math.max(0, from + (volume - from) * progress));
-
-      if (progress >= 1) {
-        if (this.fadeFrame) clearInterval(this.fadeFrame);
-        this.fadeFrame = null;
-        done?.();
-      }
-    }, 25);
-  }
-
-  private fadeOutAndPause() {
-    const token = ++this.switchToken;
-    if (!this.audio || this.audio.paused) {
-      this.update({ playing: false, url: null, blocked: false });
-      return;
-    }
-
-    this.update({ playing: false, url: null });
-    this.fadeTo(0, this.fadeMs, () => {
-      if (token === this.switchToken) this.audio?.pause();
-    });
-  }
-
-  private switchTrack(url: string) {
-    const token = ++this.switchToken;
-    const audio = this.getAudio();
-
-    const start = () => {
-      if (token !== this.switchToken) return;
-      audio.pause();
-      audio.src = url;
-      audio.currentTime = 0;
-      this.ensurePlaying(url);
-    };
-
-    if (audio.paused || audio.volume === 0) {
-      start();
-    } else {
-      this.fadeTo(0, this.fadeMs / 2, start);
-    }
-  }
-
-  private ensurePlaying(url: string) {
-    const token = ++this.switchToken;
-    const audio = this.getAudio();
-
-    if (audio.src !== url) {
-      audio.src = url;
-    }
-
-    this.update({ url, playing: true });
-
-    if (!audio.paused) {
-      this.fadeTo(this.targetVolume, this.fadeMs);
-      return;
-    }
-
-    audio.volume = 0;
-    audio
+    deck.cancelFade();
+    deck.audio.volume = 0;
+    deck.audio
       .play()
       .then(() => {
-        if (token !== this.switchToken) return;
-        this.update({ blocked: false, playing: true });
-        this.fadeTo(this.targetVolume, this.fadeMs);
+        if (deck !== this.getDecks()[0] || !this.targetUrl) return;
+        this.stopWaitingForUnlock();
+        deck.fadeTo(this.targetVolume, this.fadeMs);
       })
       .catch((err: unknown) => {
-        if (token !== this.switchToken) return;
-
         if (err instanceof DOMException && err.name === 'NotAllowedError') {
-          this.update({ blocked: true, playing: false });
           this.waitForUnlock();
         } else if (!(err instanceof DOMException && err.name === 'AbortError')) {
-          console.warn('[menu music] failed to play track', url, err);
-          this.update({ playing: false });
+          console.warn('[menu music] failed to play track', deck.url, err);
         }
       });
   }
+
+  private onUnlockGesture = () => this.resume();
 
   private waitForUnlock() {
     if (this.unlockListening) return;
     this.unlockListening = true;
 
-    const unlock = () => {
-      for (const event of UNLOCK_EVENTS) document.removeEventListener(event, unlock, true);
-      this.unlockListening = false;
-      this.resume();
-    };
+    for (const event of UNLOCK_EVENTS) document.addEventListener(event, this.onUnlockGesture, true);
+  }
 
-    for (const event of UNLOCK_EVENTS) document.addEventListener(event, unlock, true);
+  private stopWaitingForUnlock() {
+    if (!this.unlockListening) return;
+    this.unlockListening = false;
+
+    for (const event of UNLOCK_EVENTS) document.removeEventListener(event, this.onUnlockGesture, true);
   }
 }
 

@@ -10,7 +10,6 @@ import Button from '@/elements/buttons/Button.tsx';
 import Card from '@/elements/data-display/Card.tsx';
 import TitleCard from '@/elements/data-display/TitleCard.tsx';
 import NumberInput from '@/elements/input/NumberInput.tsx';
-import Select from '@/elements/input/Select.tsx';
 import Switch from '@/elements/input/Switch.tsx';
 import Group from '@/elements/layout/Group.tsx';
 import Stack from '@/elements/layout/Stack.tsx';
@@ -22,7 +21,6 @@ import getSettings from '../api/getSettings.ts';
 import updateSettings from '../api/updateSettings.ts';
 import { setPreview } from '../lib/preview.ts';
 import {
-  buttonPositionSchema,
   configQueryKey,
   DEFAULT_PAGE,
   type MenuMusicConfig,
@@ -47,8 +45,6 @@ const emptyConfig: MenuMusicConfig = {
   idleTimeoutSeconds: 60,
   fadeDurationMs: 1500,
   defaultVolume: 50,
-  showFloatingButton: true,
-  floatingButtonPosition: 'bottom_left',
 };
 
 export default function ConfigurationPage() {
@@ -133,11 +129,6 @@ export default function ConfigurationPage() {
               description={tExt('config.general.enabledDescription', {})}
               {...form.getInputProps('enabled', { type: 'checkbox' })}
             />
-            <Switch
-              label={tExt('config.general.showFloatingButton', {})}
-              description={tExt('config.general.showFloatingButtonDescription', {})}
-              {...form.getInputProps('showFloatingButton', { type: 'checkbox' })}
-            />
             <NumberInput
               label={tExt('config.general.idleTimeout', {})}
               description={tExt('config.general.idleTimeoutDescription', {})}
@@ -163,15 +154,6 @@ export default function ConfigurationPage() {
               suffix='%'
               allowDecimal={false}
               {...form.getInputProps('defaultVolume')}
-            />
-            <Select
-              label={tExt('config.general.floatingButtonPosition', {})}
-              data={buttonPositionSchema.options.map((position) => ({
-                value: position,
-                label: tExt(`buttonPositions.${position}`, {}),
-              }))}
-              disabled={!form.values.showFloatingButton}
-              {...form.getInputProps('floatingButtonPosition')}
             />
           </div>
         </TitleCard>

@@ -28,17 +28,6 @@ const translations = defineTranslations({
       idle: 'Play when idle',
       off: 'Silent',
     },
-    buttonPositions: {
-      top_left: 'Top left',
-      top_right: 'Top right',
-      bottom_left: 'Bottom left',
-      bottom_right: 'Bottom right',
-    },
-    player: {
-      play: 'Play menu music',
-      mute: 'Mute menu music',
-      blocked: 'Click to start menu music',
-    },
     account: {
       title: 'Menu Music',
       enabled: 'Play menu music',
@@ -53,14 +42,11 @@ const translations = defineTranslations({
         enabledDescription: 'Master switch for the whole extension. When off, no page plays music.',
         idleTimeout: 'Idle delay (seconds)',
         idleTimeoutDescription: 'How long a user has to be inactive before tracks set to "Play when idle" start.',
-        fadeDuration: 'Fade duration (ms)',
-        fadeDurationDescription: 'Fade in and out time when the track changes or stops.',
+        fadeDuration: 'Crossfade duration (ms)',
+        fadeDurationDescription:
+          'When you switch to a page with a different track, the old track fades out while the new one fades in over this time. Also used when music starts or stops.',
         defaultVolume: 'Default user volume',
         defaultVolumeDescription: 'Volume users start with until they pick their own on the account page.',
-        showFloatingButton: 'Show floating music button',
-        showFloatingButtonDescription:
-          'Small play/mute button in a corner of every page. Browsers block autoplay until the visitor interacts with the page, the button also lets them start the music.',
-        floatingButtonPosition: 'Floating button position',
       },
       tracks: {
         configured: 'Configured',

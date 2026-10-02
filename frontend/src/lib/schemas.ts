@@ -13,9 +13,6 @@ export type PageKey = z.infer<typeof pageKeySchema>;
 export const playModeSchema = z.enum(['always', 'idle', 'off']);
 export type PlayMode = z.infer<typeof playModeSchema>;
 
-export const buttonPositionSchema = z.enum(['top_left', 'top_right', 'bottom_left', 'bottom_right']);
-export type ButtonPosition = z.infer<typeof buttonPositionSchema>;
-
 export const trackConfigSchema = z.object({
   page: pageKeySchema,
   mode: playModeSchema,
@@ -35,8 +32,6 @@ export const menuMusicConfigSchema = z.object({
   idleTimeoutSeconds: z.number().int().min(1).max(86400),
   fadeDurationMs: z.number().int().min(0).max(30000),
   defaultVolume: z.number().int().min(0).max(100),
-  showFloatingButton: z.boolean(),
-  floatingButtonPosition: buttonPositionSchema,
 });
 export type MenuMusicConfig = z.infer<typeof menuMusicConfigSchema>;
 

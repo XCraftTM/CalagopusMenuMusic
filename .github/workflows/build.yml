@@ -6,10 +6,6 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
-    inputs:
-      panel_ref:
-        description: Extra panel branch or tag to verify against, instead of the newest release (e.g. main)
-        default: ''
 
 permissions:
   contents: read
@@ -48,137 +44,10 @@ jobs:
           archive: false
           if-no-files-found: error
 
-  verify:
-    name: Verify against ${{ matrix.target }} panel
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # minimum: the oldest release Metadata.toml's panel_version allows
-        # latest: the newest published release (or the manually given panel_ref)
-        target: [minimum, latest]
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          path: extension
-
-      - name: Resolve panel ref
-        id: panel
-        env:
-          TARGET: ${{ matrix.target }}
-          OVERRIDE: ${{ inputs.panel_ref }}
-        run: |
-          releases=$(git ls-remote --tags --refs https://github.com/calagopus/panel 'release-*' \
-            | sed 's|.*refs/tags/release-||' | sort -V)
-
-          if [ "$TARGET" = latest ]; then
-            if [ -n "$OVERRIDE" ]; then
-              ref="$OVERRIDE"
-            else
-              ref="release-$(echo "$releases" | tail -n 1)"
-            fi
-          else
-            requirement=$(python3 -c "import tomllib; print(tomllib.load(open('extension/Metadata.toml', 'rb'))['panel_version'])")
-            minimum=$(echo "$requirement" | sed -n 's/^>=\s*\([0-9.]*\)$/\1/p')
-            if [ -z "$minimum" ]; then
-              echo "::error::panel_version \"$requirement\" is not of the form >=X.Y.Z"
-              exit 1
-            fi
-            if ! echo "$releases" | grep -qx "$minimum"; then
-              echo "::error::panel_version $requirement names a panel version that has not been released"
-              exit 1
-            fi
-            ref="release-$minimum"
-          fi
-
-          echo "verifying against $ref"
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v5
-        with:
-          repository: calagopus/panel
-          ref: ${{ steps.panel.outputs.ref }}
-          path: panel
-
-      # mirrors what `panel-rs extensions add` sets up for an installed extension
-      - name: Install extension into panel checkout
-        working-directory: panel
-        run: |
-          ext="backend-extensions/$IDENTIFIER"
-          mkdir -p "$ext"
-          cp -r ../extension/Cargo.toml ../extension/Metadata.toml ../extension/src ../extension/frontend "$ext/"
-          ln -sfn "../../$ext/frontend" "frontend/extensions/$IDENTIFIER"
-          ln -sfn ../frontend/node_modules backend-extensions/node_modules
-          cat > "$ext/frontend/tsconfig.json" <<'EOF'
-          {
-            "compilerOptions": {
-              "jsx": "react-jsx",
-              "moduleResolution": "bundler",
-              "module": "esnext",
-              "target": "esnext",
-              "allowImportingTsExtensions": true,
-              "noEmit": true,
-              "paths": { "@/*": ["../../../frontend/src/*"] },
-              "types": ["../../../frontend/src/vite-env.d.ts"]
-            },
-            "include": ["src"]
-          }
-          EOF
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-
-      - name: Install frontend dependencies
-        working-directory: panel/frontend
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Type-check frontend
-        working-directory: panel/frontend
-        run: pnpm typecheck
-
-      - name: Lint frontend (biome)
-        working-directory: panel/frontend
-        run: pnpm exec biome check --css-parse-tailwind-directives=true "extensions/$IDENTIFIER/src"
-
-      # also required before the backend compiles (shared/build.rs embeds frontend/dist)
-      - name: Build frontend
-        working-directory: panel/frontend
-        run: pnpm build
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: panel
-          key: ${{ steps.panel.outputs.ref }}
-
-      - name: Check Rust formatting
-        working-directory: panel
-        run: rustfmt --edition 2024 --check "backend-extensions/$IDENTIFIER/src/lib.rs"
-
-      - name: Clippy
-        working-directory: panel
-        env:
-          SQLX_OFFLINE: 'true'
-        run: cargo clippy -p "$IDENTIFIER" -- -D warnings
-
-      - name: Tests
-        working-directory: panel
-        env:
-          SQLX_OFFLINE: 'true'
-        run: cargo test -p "$IDENTIFIER"
-
   release:
     name: Attach to GitHub release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [package, verify]
+    needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: write

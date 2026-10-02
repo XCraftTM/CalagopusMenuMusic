@@ -9,9 +9,9 @@ A [Calagopus Panel](https://calagopus.com) extension (`dev.xcrafttm.menumusic`) 
 - **Three playback modes for every track.** *Always play*, *Play when idle* (starts after the user has been inactive for a set time and fades out on the next input), and *Silent*.
 - **Direct links or panel assets.** The track URL field autocompletes audio files from the panel's **Admin → Assets** tab, the same way the Application icon field does. You can also paste any direct `https://…` audio link, or use **Upload** to send a file straight into `assets/menu-music/`.
 - **Preview and per-track volume** on the configuration page.
-- **Smooth transitions.** Tracks fade out and in when they change. When two pages use the same track, it keeps playing across navigation instead of restarting.
-- **User controls.** Each user gets a **Menu Music** card on their **Account** page with an on/off switch and a volume slider. These settings sync to the account and are remembered on the login screen too. An optional floating play/mute button (shown in any corner you pick) appears on every page.
-- **Autoplay handling.** Browsers block audio until the visitor interacts with the page. The music starts on the first click or keypress, and the floating button pulses while it waits.
+- **Crossfades between pages.** When you move to a page with a different track, the old track fades out while the new one fades in, over the configured crossfade duration. When two pages use the same track, it keeps playing across navigation instead of restarting. Music also fades in and out when it starts, stops, is muted, or reaches the idle delay.
+- **User controls.** Each user gets a **Menu Music** card on their **Account** page with an on/off switch and a volume slider. These settings sync to the account and are remembered on the login screen too.
+- **Autoplay handling.** Browsers block audio until the visitor interacts with the page. Nothing is shown on screen for this: the music simply starts with whatever the current page should play on the first click, tap or key press anywhere.
 
 ## Configuration page
 
@@ -23,9 +23,8 @@ General options:
 
 - master on/off switch
 - idle delay in seconds, used by tracks set to *Play when idle*
-- fade duration
+- crossfade duration
 - the volume new users start with
-- whether the floating button is shown, and where
 
 ## Installing
 
@@ -41,11 +40,9 @@ Requires Panel `>=1.2.3`.
 
 ### GitHub Actions
 
-`.github/workflows/build.yml` runs on every push, on pull requests, and manually from the **Actions** tab:
+`.github/workflows/build.yml` runs on every push, on pull requests, and manually from the **Actions** tab. It builds the `.c7s.zip` and uploads it to the run. Open the run and download `dev_xcrafttm_menumusic.c7s.zip` under **Artifacts**. The download is the installable archive itself, so you don't need to unzip anything.
 
-- **Package** builds the `.c7s.zip` and uploads it as a workflow artifact. Open the run, then download `dev_xcrafttm_menumusic.c7s.zip` under **Artifacts**. The download is the installable archive itself, so no extra unzipping is needed.
-- **Verify** installs the extension into a fresh checkout of [calagopus/panel](https://github.com/calagopus/panel). It runs the TypeScript type-check, biome, the full frontend build, rustfmt, clippy and the tests. A manual run lets you pick the panel branch or tag to check against.
-- **Release:** pushing a tag like `v1.0.0` attaches the archive to a GitHub release once both jobs pass. The tag must match `version` in `Cargo.toml`.
+Pushing a tag like `v1.0.0` also attaches the archive to a GitHub release. The tag must match `version` in `Cargo.toml`.
 
 ### Developing
 
@@ -62,10 +59,10 @@ src/
   routes/admin/settings.rs   GET/PUT /api/admin/extensions/dev.xcrafttm.menumusic/settings
 frontend/src/
   index.tsx                  mounts the player globally + the account card
-  elements/MenuMusic.tsx     picks the track for the current URL, floating button
+  elements/MenuMusic.tsx     picks the track for the current URL
   elements/AccountMusicCard.tsx
   pages/ConfigurationPage.tsx, pages/TrackEditor.tsx
-  lib/player.ts              audio element, fades, autoplay unlock
+  lib/player.ts              two audio decks, crossfades, autoplay unlock
   lib/pages.ts               URL -> page mapping
 ```
 

@@ -37,16 +37,6 @@ pub enum PlayMode {
     Off,
 }
 
-#[derive(ToSchema, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum ButtonPosition {
-    TopLeft,
-    TopRight,
-    #[default]
-    BottomLeft,
-    BottomRight,
-}
-
 #[derive(ToSchema, Serialize, Deserialize, Clone)]
 pub struct TrackConfig {
     /// One of [`DEFAULT_PAGE`] or [`PAGES`].
@@ -78,14 +68,10 @@ pub struct ExtensionSettingsData {
     pub tracks: Vec<TrackConfig>,
     /// Seconds without input before tracks in [`PlayMode::Idle`] start playing.
     pub idle_timeout_seconds: u32,
-    /// Fade in / fade out duration when switching tracks.
+    /// Crossfade duration when the track changes, also used to fade in and out.
     pub fade_duration_ms: u32,
     /// Volume in percent users start with before they pick their own.
     pub default_volume: u8,
-    /// Shows a small floating play / mute button in the corner of every page.
-    pub show_floating_button: bool,
-    /// Screen corner the floating button sits in.
-    pub floating_button_position: ButtonPosition,
 }
 
 impl Default for ExtensionSettingsData {
@@ -96,8 +82,6 @@ impl Default for ExtensionSettingsData {
             idle_timeout_seconds: 60,
             fade_duration_ms: 1500,
             default_volume: 50,
-            show_floating_button: true,
-            floating_button_position: ButtonPosition::default(),
         }
     }
 }
@@ -208,12 +192,7 @@ impl SettingsSerializeExt for ExtensionSettingsData {
                 "fade_duration_ms",
                 self.fade_duration_ms.to_compact_string(),
             )
-            .write_raw_setting("default_volume", self.default_volume.to_compact_string())
-            .write_raw_setting(
-                "show_floating_button",
-                self.show_floating_button.to_compact_string(),
-            )
-            .write_serde_setting("floating_button_position", &self.floating_button_position)?)
+            .write_raw_setting("default_volume", self.default_volume.to_compact_string()))
     }
 }
 
@@ -247,13 +226,6 @@ impl SettingsDeserializeExt for ExtensionSettingsDataDeserializer {
                 .take_raw_setting("default_volume")
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(defaults.default_volume),
-            show_floating_button: deserializer
-                .take_raw_setting("show_floating_button")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(defaults.show_floating_button),
-            floating_button_position: deserializer
-                .read_serde_setting("floating_button_position")
-                .unwrap_or(defaults.floating_button_position),
         };
         data.normalize();
 
