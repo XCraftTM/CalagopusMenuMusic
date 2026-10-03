@@ -1,93 +1,176 @@
-# CalagopusMenuMusic
+<div align="center">
 
-A [Calagopus Panel](https://calagopus.com) extension (`dev.xcrafttm.menumusic`) that plays background music which changes with the page the visitor is on. Admins configure it under **Admin → Extensions → Menu Music → Configure**.
+# 🎵 Menu Music
 
-## Features
+**Background music and interface sounds for the [Calagopus](https://calagopus.com) panel.**
 
-- **A track per page.** Login, Register, Password Reset & Email Verification, Server List, Account Settings, Server Pages (console, files, settings, allocations and every other server sub-page), and the Admin Area. Each page shows the URLs it covers, e.g. `/auth/login/*`.
-- **Custom pages by URL.** Add your own pages with a name and a URL pattern where `*` is a wildcard, e.g. `/server/*/files*` for every server's file manager. A matching custom page wins over a built-in one, and the most specific pattern wins when several match.
-- **A Default track.** It plays on every page that has no track of its own.
-- **Three playback modes for every track.** *Always play*, *Play when idle* (starts after the user has been inactive for a set time and fades out on the next input), and *Silent*.
-- **Direct links or panel assets.** The track URL field autocompletes audio files from the panel's **Admin → Assets** tab, the same way the Application icon field does. You can also paste any direct `https://…` audio link, or use **Upload** to send a file straight into `assets/menu-music/`.
-- **Preview and per-track volume** on the configuration page.
-- **Crossfades between pages.** When you move to a page with a different track, the old track fades out while the new one fades in, over the configured crossfade duration. When two pages use the same track, it keeps playing across navigation instead of restarting. Looping uses the same crossfade: when a track reaches its end, it fades into its own beginning instead of jumping back. Tracks shorter than two crossfades use the browser's normal seamless loop. Music also fades in and out when it starts, stops, is muted, or reaches the idle delay.
-- **User controls.** Each user gets a **Menu Music** card on their **Account** page with an on/off switch and a volume slider. These settings sync to the account and are remembered on the login screen too. Logged-out visitors get a **Menu music** switch under the login form. Turning it off fades the music out and pauses it, and turning it back on resumes where it stopped. The choice is remembered on that device.
-- **Interface sounds.** Play a short sound when a button is pressed, a checkbox or switch is turned on or off, or a select menu is opened, closed or an option is picked. While a sound plays, the music quickly fades out (250 ms by default, overridable per sound) and pauses, then fades back in from the same spot. Each sound can be limited to:
-  - **targets**, picked from a search over the panel's own texts (in your language, English or by translation key) and icons for icon-only buttons;
-  - for select menus, **options**;
-  - a **page** URL pattern.
+Give your panel a soundtrack: a theme for the login screen, another for the server list, calm ambience while
+someone works on a server, smooth crossfades between them, and little click sounds for buttons, switches and menus.
 
-  Targets are stored as translation keys, so a sound set up on "Save" also plays for a German user clicking "Speichern". When several sounds match, one with targets beats one without, then the more specific page pattern wins. Users can turn interface sounds off separately from the music on their Account page.
-- **Autoplay handling.** Browsers block audio until the visitor interacts with the page. Nothing is shown on screen for this: the music simply starts with whatever the current page should play on the first click, tap or key press anywhere.
+[![Download](https://img.shields.io/github/v/release/XCraftTM/CalagopusMenuMusic?label=download&color=blue)](https://github.com/XCraftTM/CalagopusMenuMusic/releases/latest)
+![Calagopus](https://img.shields.io/badge/Calagopus%20panel-1.2.3%2B-5c7cfa)
 
-## Configuration page
+<img src="docs/images/settings-music.png" alt="The Menu Music settings page with the Background Music tab open" width="820">
 
-**Save** sits at the top of the page. Like the panel's own settings pages, **Ctrl+S** (**Cmd+S** on macOS) saves too, or whatever the user bound *Save* to under **Account → Shortcuts**.
+</div>
 
-Below it, the **General** card holds the master on/off switch and the volume new users start with. Both apply to music and interface sounds.
+## ✨ Features
 
-The rest is split into two tabs. The open tab is kept in the URL (`?tab=sounds`), so reloads and shared links keep it. If saving fails because of a field on the other tab, the page switches to that tab, and tabs with errors are marked.
+- 🎶 **A track for every page.** Login, register, server list, account, every server page, the admin area, or
+  any URL you like (`/server/*/files*`). Pages without their own track play the Default track.
+- 🔀 **Smooth crossfades.** Switching pages fades one track into the next, and tracks loop seamlessly by fading
+  into their own beginning. If two pages share a track, it simply keeps playing.
+- 💤 **Idle music.** Let a track start only after someone has been inactive for a while, and fade away as soon
+  as they move the mouse again.
+- 🔊 **Interface sounds.** Play a sound when a button is pressed, a switch is turned on or off, or a select menu
+  is opened, closed or used. The music briefly fades out for the sound and picks up right where it left off.
+- 🌍 **Works in every language.** Pick the "Save" button once and the sound also plays for a German user
+  pressing "Speichern".
+- 📁 **Your own files.** Upload audio straight from the settings page, pick files from the panel's Assets, or
+  paste any link to an audio file.
+- 🎧 **Users stay in control.** Everyone can turn music and sounds off or change the volume, even on the login
+  screen.
 
-**Background Music**
+## 📦 Installation
 
-- **Music Settings**: the idle delay (for tracks set to *Play when idle*) and the crossfade duration.
+1. Download **`dev_xcrafttm_menumusic.c7s.zip`** from the [latest release](https://github.com/XCraftTM/CalagopusMenuMusic/releases/latest).
+2. In your panel, go to **Admin → Extensions** and upload the file
+   ([how to install extensions](https://calagopus.com/docs/panel/extensions/installing-extensions)).
+3. Open **Admin → Extensions → Menu Music → Configure**.
 
-| Left: **Configured** | Right: **Using Default Track** |
+> [!NOTE]
+> Needs Calagopus **1.2.3 or newer** running the `:heavy` Docker image, which is the one that supports extensions.
+
+## 🚀 Quick start
+
+1. On the **Background Music** tab, give the **Default** track a song: **Upload** a file or pick one from your
+   Assets. Press **Preview** to listen.
+2. Want different music somewhere? Press **Add** next to a page on the right, or create a **Custom Page** from a
+   URL pattern.
+3. On the **Interface Sounds** tab, press **Add sound**. Choose what it plays on, then search for the button,
+   switch or menu, e.g. "Save" or the trash icon.
+4. Press **Save**, or <kbd>Ctrl</kbd>+<kbd>S</kbd>.
+
+<div align="center">
+<img src="docs/images/settings-sounds.png" alt="The Interface Sounds tab with three sounds" width="820">
+</div>
+
+## 👤 What your users see
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/account-card.png" alt="Menu Music card on the account page" width="300"><br>
+      <sub>A <b>Menu Music</b> card on the Account page: music and sounds on/off, and a volume slider.</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/login-toggle.png" alt="Menu music switch below the login form" width="300"><br>
+      <sub>A small <b>Menu music</b> switch below the login form for visitors who aren't logged in.</sub>
+    </td>
+  </tr>
+</table>
+
+## ❓ Good to know
+
+- **Why doesn't the music start right away?** Browsers don't allow websites to play sound before the visitor has
+  interacted with the page. The music starts on the first click or key press, and nothing extra appears on screen.
+- **Which file formats work?** Anything the visitor's browser can play. MP3, OGG, WAV and M4A all work in every
+  modern browser.
+- **Can I turn everything off quickly?** Yes, the **Enable menu music** switch at the top of the settings page
+  turns off all music and sounds for everyone.
+- **Does it work with themes?** Yes. The login switch is built to stay in place even with themes that heavily
+  restyle the login page, like [qunix_theme](https://github.com/mrbeeenopro/qunix_theme).
+
+---
+
+## 🛠 Technical details
+
+This part is for developers and curious admins. It explains how the extension works, not every setting.
+
+### Overview
+
+The extension has a small **Rust backend** and a **React frontend**, like every Calagopus extension.
+
+- **Backend** (`src/`). The settings live in the panel's own extension settings store: simple values as one row
+  each, tracks and sounds as JSON. Everything is validated on save and cleaned up again when loaded, so a
+  hand-edited database or an older format can't break the frontend. There are two routes:
+  - `GET /api/extensions/dev.xcrafttm.menumusic/config` is public. The login page needs it before anyone is
+    logged in, and it only contains audio URLs and playback settings.
+  - `GET` and `PUT /api/admin/extensions/dev.xcrafttm.menumusic/settings` need the `extensions.read` and
+    `extensions.manage` admin permissions. Saving writes an entry to the admin activity log.
+- **Frontend** (`frontend/src/`). It plugs into the panel through extension slots:
+  - two invisible components on every page, one for the music and one for interface sounds;
+  - the card on the Account page;
+  - the switch below the login form;
+  - the settings page.
+
+### Which track plays
+
+For the current URL, the extension checks in order:
+
+1. **Custom pages.** If several patterns match, the most specific one wins (the one with the most non-wildcard
+   characters).
+2. **The built-in page** for that URL, if it has its own track.
+3. **The Default track.**
+
+`*` matches anything, and a pattern ending in `/*` also matches the path itself, so `/admin/*` matches `/admin`.
+
+### The audio engine
+
+The music runs on two `<audio>` elements, called decks, that take turns:
+
+- **Changing tracks.** The new track starts on the idle deck while the other fades out. The fade uses an
+  equal-power curve, so the volume doesn't dip in the middle.
+- **Looping.** Shortly before a track ends, a fresh copy starts on the other deck and crossfades in. Tracks
+  shorter than two crossfades use the browser's normal loop instead.
+- **Pausing.** Pausing keeps the playback position, so idle music and ducked music continue where they stopped.
+- **Autoplay blocking.** If the browser blocks playback, the player waits for the first click, tap or key press
+  and then plays whatever the current page needs.
+- **Ducking.** An interface sound fades the music out and pauses it while the sound plays, then fades it back in.
+  If the page changes during a sound, the new track is queued and starts once the sound is over.
+
+### How interface sounds find their buttons
+
+Panel buttons have no IDs, so the extension recognizes elements by what the panel calls them internally:
+
+- **Translation keys.** Almost every label in the panel comes from a translation key, like `common.button.save`.
+  When something is clicked, the extension converts the visible text back into keys using the panel's
+  translation table for the visitor's language, and compares those keys with the sound's targets. That's why one
+  target works in every language. Labels with placeholders, like "Delete {name}", still match.
+- **Icon names.** Icon-only buttons have no text, so they're matched by their icon name, like `trash`. The list
+  of icons for the search box ships as a static file (`frontend/public/dev.xcrafttm.menumusic/icons.json`) that
+  only the settings page downloads. Importing the icon packages directly would have added every icon to the
+  panel's shared JavaScript bundle that all visitors load.
+- **Detection.** One page-wide listener watches clicks and checkbox changes. A watcher on the
+  `data-expanded` attribute of the panel's select inputs reports select menus opening and closing. Each button
+  is identified when it's pressed, not only when the click lands, because some buttons change on press (the
+  password field's eye icon becomes `eye-slash`).
+
+### User preferences
+
+The music switch, the sounds switch and the volume are stored as panel user settings under
+`dev.xcrafttm.menumusic::muted`, `::sounds_muted` and `::volume`, so they follow the user across devices. A
+copy is kept in the browser's local storage so the choice also applies on the login page, where no user is
+logged in yet.
+
+### Building
+
+| What | How |
 | --- | --- |
-| The **Default** track is always first. Below it are the pages you gave their own track, each with playback mode, URL (asset autocomplete, upload, preview) and volume. They are shown in two columns when there is room. **Use default** moves a built-in page back to the right, and **Remove** deletes a custom page. | Every built-in page without its own track. These pages play the Default track. **Add** moves a page to the left so you can configure it. Below the list, **Add Custom Page** creates a page from a name and a URL pattern. |
+| Build the `.c7s.zip` | `python3 scripts/package.py` (Python 3.11+) writes `dist/dev_xcrafttm_menumusic.c7s.zip` |
+| CI | Every push builds the zip and attaches it to the workflow run under **Artifacts** |
+| Release | Push a tag like `v1.0.0` matching the version in `Cargo.toml`. CI attaches the zip to a GitHub release and uses that version's section from [`CHANGELOG.md`](CHANGELOG.md) as release notes |
+| Refresh the icon list | `node scripts/generate-icons.mjs <panel>/frontend` after the panel updates its icon packages |
+| Develop and test | Install the zip into a [development environment](https://calagopus.com/docs/panel/extensions/dev-environment) with `panel-rs extensions add`, then use the panel's [pre-export checks](https://calagopus.com/docs/panel/extensions/getting-your-extension-ready): `cargo clippy`, `cargo test -p dev_xcrafttm_menumusic`, `pnpm biome:validate` and `pnpm build:ci` |
 
-**Interface Sounds**
-
-- The interface sound fade and **Add sound**.
-- The sound cards, in up to three columns depending on the available width. Each card has its trigger, targets, page, sound file (asset autocomplete, upload, preview), volume and optional fade override.
-
-## Installing
-
-1. Build the extension archive (needs Python 3.11+):
-
-   ```bash
-   python3 scripts/package.py   # writes dist/dev_xcrafttm_menumusic.c7s.zip
-   ```
-
-2. Install `dev_xcrafttm_menumusic.c7s.zip` on a panel running the `:heavy` image. You can upload it in **Admin → Extensions**, or use `panel-rs extensions add`. See [Installing Extensions](https://calagopus.com/docs/panel/extensions/installing-extensions).
-
-Requires Panel `>=1.2.3`.
-
-### GitHub Actions
-
-`.github/workflows/build.yml` runs on every push, on pull requests, and manually from the **Actions** tab. It builds the `.c7s.zip` and uploads it to the run. Open the run and download `dev_xcrafttm_menumusic.c7s.zip` under **Artifacts**. The download is the installable archive itself, so you don't need to unzip anything.
-
-Pushing a tag like `v1.0.0` also attaches the archive to a GitHub release. The tag must match `version` in `Cargo.toml`.
-
-### Developing
-
-Install the archive into a [development environment](https://calagopus.com/docs/panel/extensions/dev-environment) with `panel-rs extensions add dist/dev_xcrafttm_menumusic.c7s.zip`. That command creates the links and `frontend/tsconfig.json` the panel build needs. Then run the [pre-export checks](https://calagopus.com/docs/panel/extensions/getting-your-extension-ready): `cargo clippy`, `cargo test -p dev_xcrafttm_menumusic`, `pnpm biome:fix-unsafe` and `pnpm build:ci`.
-
-## Layout
+### Project layout
 
 ```
-Cargo.toml / Metadata.toml   extension metadata
-src/
-  lib.rs                     route + settings registration
-  settings.rs                stored settings, validation, defaults
-  routes/public.rs           GET /api/extensions/dev.xcrafttm.menumusic/config  (no auth, for the login page)
-  routes/admin/settings.rs   GET/PUT /api/admin/extensions/dev.xcrafttm.menumusic/settings
+src/                        Rust backend: settings model + validation, public and admin routes
 frontend/src/
-  index.tsx                  mounts the player globally + the account card
-  elements/MenuMusic.tsx     picks the track for the current URL
-  elements/AccountMusicCard.tsx
-  elements/InterfaceSounds.tsx  plays interface sounds for button/checkbox/select interactions
-  pages/ConfigurationPage.tsx, pages/TrackEditor.tsx, pages/SoundEditor.tsx, pages/TargetPicker.tsx
-  lib/player.ts              two audio decks, crossfades, ducking, autoplay unlock
-  lib/sfx.ts                 interface sound playback
-  lib/interactions.ts        page-wide detection of button presses, toggles and select menus
-  lib/targets.ts             visible text -> translation keys (any language), icons
-  lib/pages.ts               URL -> page mapping
-frontend/public/dev.xcrafttm.menumusic/icons.json
-                             icon list for the target picker, regenerate with
-                             `node scripts/generate-icons.mjs <panel>/frontend`
+  elements/                 global music and sound components, account card, login switch
+  pages/                    the settings page (tabs, track and sound editors, target search)
+  lib/                      audio engine, interaction detection, URL matching, translation lookup
+frontend/public/            static files served by the panel (the icon list)
+scripts/                    packaging and icon list generation
 ```
-
-The icon list is a static file on purpose: the settings page only downloads it when it is opened, while importing the icon packages directly would put every icon into the panel bundle all visitors load.
-
-Uploading needs the `assets.upload` admin permission and asset autocomplete needs `assets.read`. Reading the settings needs `extensions.read`, and saving them needs `extensions.manage`.
