@@ -159,7 +159,7 @@ logged in yet.
 | --- | --- |
 | Build the `.c7s.zip` | `python3 scripts/package.py` (Python 3.11+) writes `dist/dev_xcrafttm_menumusic.c7s.zip` |
 | CI | Every push builds the zip and attaches it to the workflow run under **Artifacts** |
-| Release | Push a tag like `v1.0.0` matching the version in `Cargo.toml`. CI attaches the zip to a GitHub release and uses that version's section from [`CHANGELOG.md`](CHANGELOG.md) as release notes |
+| Release | Bump `version` in `Cargo.toml` and add a section to [`CHANGELOG.md`](CHANGELOG.md). Then either run the workflow by hand on `main` with **release** ticked (it creates the `v<version>` tag itself), or push a matching `v<version>` tag. The zip is attached to the release and the changelog section becomes the release notes |
 | Refresh the icon list | `node scripts/generate-icons.mjs <panel>/frontend` after the panel updates its icon packages |
 | Develop and test | Install the zip into a [development environment](https://calagopus.com/docs/panel/extensions/dev-environment) with `panel-rs extensions add`, then use the panel's [pre-export checks](https://calagopus.com/docs/panel/extensions/getting-your-extension-ready): `cargo clippy`, `cargo test -p dev_xcrafttm_menumusic`, `pnpm biome:validate` and `pnpm build:ci` |
 
