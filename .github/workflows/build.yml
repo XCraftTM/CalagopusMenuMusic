@@ -77,10 +77,14 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/download-artifact@v8
+      # rebuilt from this commit instead of downloading the artifact: download-artifact unpacks
+      # .zip files, which left only the archive's contents and nothing to attach
+      - uses: actions/setup-python@v6
         with:
-          name: ${{ env.IDENTIFIER }}.c7s.zip
-          path: dist
+          python-version: '3.12'
+
+      - name: Build archive
+        run: python3 scripts/package.py
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -89,3 +93,4 @@ jobs:
           name: Menu Music v${{ needs.package.outputs.version }}
           body_path: release-notes.md
           files: dist/${{ env.IDENTIFIER }}.c7s.zip
+          fail_on_unmatched_files: true
