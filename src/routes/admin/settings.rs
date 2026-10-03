@@ -82,6 +82,7 @@ mod put {
                         .iter()
                         .map(|t| t.page.as_str())
                         .collect::<Vec<_>>(),
+                    "sounds": data.sounds.len(),
                 }),
             )
             .await;

@@ -1,4 +1,12 @@
-import { faFloppyDisk, faGear, faLink, faListUl, faPlus, faRoute } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFloppyDisk,
+  faGear,
+  faLink,
+  faListUl,
+  faPlus,
+  faRoute,
+  faVolumeHigh,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -25,18 +33,22 @@ import { setPreview } from '../lib/preview.ts';
 import {
   configQueryKey,
   DEFAULT_PAGE,
+  DEFAULT_SOUND_FADE_MS,
   isValidPathPattern,
   MAX_CUSTOM_NAME_LENGTH,
   MAX_CUSTOM_PATH_LENGTH,
   type MenuMusicConfig,
   menuMusicConfigSchema,
   newCustomPageKey,
+  newSoundId,
   PACKAGE_NAME,
   PAGES,
+  type SoundConfig,
   type TrackConfig,
 } from '../lib/schemas.ts';
 import { useExtTranslations } from '../translations.ts';
 import PageHeading from './PageHeading.tsx';
+import SoundEditor, { type SoundErrors } from './SoundEditor.tsx';
 import TrackEditor from './TrackEditor.tsx';
 
 const PAGE_ORDER: string[] = [DEFAULT_PAGE, ...PAGES];
@@ -57,6 +69,8 @@ const emptyConfig: MenuMusicConfig = {
   idleTimeoutSeconds: 60,
   fadeDurationMs: 1500,
   defaultVolume: 50,
+  sounds: [],
+  soundFadeMs: DEFAULT_SOUND_FADE_MS,
 };
 
 export default function ConfigurationPage() {
@@ -146,6 +160,36 @@ export default function ConfigurationPage() {
     );
   };
 
+  const addSound = () => {
+    const sound: SoundConfig = {
+      id: newSoundId(),
+      name: tExt('config.sounds.newName', { number: form.values.sounds.length + 1 }),
+      enabled: true,
+      trigger: 'button',
+      checkboxState: 'both',
+      selectEvent: 'selected',
+      targets: [],
+      optionTargets: [],
+      path: '',
+      url: '',
+      volume: 100,
+      fadeMs: null,
+    };
+    form.setFieldValue('sounds', [...form.values.sounds, sound]);
+  };
+
+  const soundErrors = (index: number): SoundErrors => {
+    const error = (field: string) => form.errors[`sounds.${index}.${field}`] as string | undefined;
+    return {
+      name: error('name'),
+      targets: error('targets'),
+      optionTargets: error('optionTargets'),
+      path: error('path'),
+      url: error('url'),
+      fadeMs: error('fadeMs'),
+    };
+  };
+
   const doSave = () => {
     setLoading(true);
 
@@ -207,6 +251,15 @@ export default function ConfigurationPage() {
               suffix='%'
               allowDecimal={false}
               {...form.getInputProps('defaultVolume')}
+            />
+            <NumberInput
+              label={tExt('config.general.soundFade', {})}
+              description={tExt('config.general.soundFadeDescription', {})}
+              min={0}
+              max={30000}
+              step={50}
+              allowDecimal={false}
+              {...form.getInputProps('soundFadeMs')}
             />
           </div>
         </TitleCard>
@@ -315,6 +368,53 @@ export default function ConfigurationPage() {
             </TitleCard>
           </Stack>
         </div>
+
+        <TitleCard title={tExt('config.sounds.title', {})} icon={<FontAwesomeIcon icon={faVolumeHigh} />}>
+          <Stack>
+            <Group justify='space-between' align='flex-start' wrap='nowrap'>
+              <Text size='sm' c='dimmed'>
+                {tExt('config.sounds.description', {})}
+              </Text>
+              <Button
+                variant='light'
+                className='shrink-0'
+                leftSection={<FontAwesomeIcon icon={faPlus} />}
+                onClick={addSound}
+              >
+                {tExt('config.sounds.add', {})}
+              </Button>
+            </Group>
+
+            {form.values.sounds.length === 0 && (
+              <Text size='sm' fs='italic'>
+                {tExt('config.sounds.none', {})}
+              </Text>
+            )}
+
+            <div className='@container'>
+              <div className='grid grid-cols-1 @4xl:grid-cols-2 gap-4'>
+                {form.values.sounds.map((sound, index) => (
+                  <SoundEditor
+                    key={sound.id}
+                    sound={sound}
+                    errors={soundErrors(index)}
+                    defaultFadeMs={form.values.soundFadeMs}
+                    assetUrls={assetUrls}
+                    canUpload={canUploadAssets}
+                    onChange={(next) => form.setFieldValue(`sounds.${index}`, next)}
+                    onRemove={() =>
+                      form.setFieldValue(
+                        'sounds',
+                        form.values.sounds.filter((s) => s.id !== sound.id),
+                      )
+                    }
+                    onUploaded={() => assets.invalidate()}
+                  />
+                ))}
+              </div>
+            </div>
+          </Stack>
+        </TitleCard>
       </Stack>
     </form>
   );

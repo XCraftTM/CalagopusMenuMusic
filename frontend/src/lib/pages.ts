@@ -72,7 +72,7 @@ export function pathMatchesPattern(pathname: string, pattern: string): boolean {
 }
 
 /** The more literal characters a pattern has, the more specific it is. */
-function specificity(pattern: string): number {
+export function patternSpecificity(pattern: string): number {
   return pattern.replaceAll('*', '').length;
 }
 
@@ -84,7 +84,7 @@ export function resolveTrack(config: MenuMusicConfig, pathname: string): TrackCo
   let custom: TrackConfig | null = null;
   for (const track of config.tracks) {
     if (!isCustomPage(track.page) || !track.path || !pathMatchesPattern(pathname, track.path)) continue;
-    if (!custom || specificity(track.path) > specificity(custom.path)) custom = track;
+    if (!custom || patternSpecificity(track.path) > patternSpecificity(custom.path)) custom = track;
   }
   if (custom) return custom;
 

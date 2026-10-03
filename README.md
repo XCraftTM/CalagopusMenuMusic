@@ -12,6 +12,12 @@ A [Calagopus Panel](https://calagopus.com) extension (`dev.xcrafttm.menumusic`) 
 - **Preview and per-track volume** on the configuration page.
 - **Crossfades between pages.** When you move to a page with a different track, the old track fades out while the new one fades in, over the configured crossfade duration. When two pages use the same track, it keeps playing across navigation instead of restarting. Looping uses the same crossfade: when a track reaches its end, it fades into its own beginning instead of jumping back. Tracks shorter than two crossfades use the browser's normal seamless loop. Music also fades in and out when it starts, stops, is muted, or reaches the idle delay.
 - **User controls.** Each user gets a **Menu Music** card on their **Account** page with an on/off switch and a volume slider. These settings sync to the account and are remembered on the login screen too. Logged-out visitors get a **Menu music** switch under the login form. Turning it off fades the music out and pauses it, and turning it back on resumes where it stopped. The choice is remembered on that device.
+- **Interface sounds.** Play a short sound when a button is pressed, a checkbox or switch is turned on or off, or a select menu is opened, closed or an option is picked. While a sound plays, the music quickly fades out (250 ms by default, overridable per sound) and pauses, then fades back in from the same spot. Each sound can be limited to:
+  - **targets**, picked from a search over the panel's own texts (in your language, English or by translation key) and icons for icon-only buttons;
+  - for select menus, **options**;
+  - a **page** URL pattern.
+
+  Targets are stored as translation keys, so a sound set up on "Save" also plays for a German user clicking "Speichern". When several sounds match, one with targets beats one without, then the more specific page pattern wins. Users can turn interface sounds off separately from the music on their Account page.
 - **Autoplay handling.** Browsers block audio until the visitor interacts with the page. Nothing is shown on screen for this: the music simply starts with whatever the current page should play on the first click, tap or key press anywhere.
 
 ## Configuration page
@@ -28,6 +34,9 @@ General options:
 - idle delay in seconds, used by tracks set to *Play when idle*
 - crossfade duration
 - the volume new users start with
+- interface sound fade
+
+Below the page tracks, **Interface Sounds** lists the sounds, each with its trigger, targets, page, sound file (asset autocomplete, upload, preview), volume and optional fade override.
 
 ## Installing
 
@@ -64,9 +73,18 @@ frontend/src/
   index.tsx                  mounts the player globally + the account card
   elements/MenuMusic.tsx     picks the track for the current URL
   elements/AccountMusicCard.tsx
-  pages/ConfigurationPage.tsx, pages/TrackEditor.tsx
-  lib/player.ts              two audio decks, crossfades, autoplay unlock
+  elements/InterfaceSounds.tsx  plays interface sounds for button/checkbox/select interactions
+  pages/ConfigurationPage.tsx, pages/TrackEditor.tsx, pages/SoundEditor.tsx, pages/TargetPicker.tsx
+  lib/player.ts              two audio decks, crossfades, ducking, autoplay unlock
+  lib/sfx.ts                 interface sound playback
+  lib/interactions.ts        page-wide detection of button presses, toggles and select menus
+  lib/targets.ts             visible text -> translation keys (any language), icons
   lib/pages.ts               URL -> page mapping
+frontend/public/dev.xcrafttm.menumusic/icons.json
+                             icon list for the target picker, regenerate with
+                             `node scripts/generate-icons.mjs <panel>/frontend`
 ```
+
+The icon list is a static file on purpose: the settings page only downloads it when it is opened, while importing the icon packages directly would put every icon into the panel bundle all visitors load.
 
 Uploading needs the `assets.upload` admin permission and asset autocomplete needs `assets.read`. Reading the settings needs `extensions.read`, and saving them needs `extensions.manage`.

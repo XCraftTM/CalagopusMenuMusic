@@ -75,6 +75,10 @@ class Deck {
  * other deck while the ending one fades out, so the loop point is a crossfade instead of a jump.
  * Pausing keeps the position, so a track that comes back (e.g. idle music) resumes where it was.
  * If the browser blocks autoplay, playback starts on the first click or key press anywhere.
+ *
+ * Interface sounds "duck" the music: it quickly fades out and pauses while the sound plays and
+ * fades back in from the same position afterwards. Page changes while ducked only queue up the
+ * new track, it starts once the music is released again.
  */
 class MenuMusicPlayer {
   private decks: [Deck, Deck] | null = null;
@@ -85,6 +89,7 @@ class MenuMusicPlayer {
   private fadeMs = 1500;
 
   private unlockListening = false;
+  private ducked = false;
 
   public setFadeDuration(ms: number) {
     this.fadeMs = Math.max(0, ms);
@@ -103,6 +108,20 @@ class MenuMusicPlayer {
     this.targetVolume = clampedVolume;
 
     const [current, other] = this.getDecks();
+
+    if (this.ducked) {
+      // only prepare the deck, `unduck` starts it
+      if (resolvedUrl && current.url !== resolvedUrl) {
+        this.active = 1 - this.active;
+        if (other.url !== resolvedUrl) {
+          other.cancelFade();
+          other.audio.pause();
+          other.audio.volume = 0;
+          other.audio.src = resolvedUrl;
+        }
+      }
+      return;
+    }
 
     if (!resolvedUrl || clampedVolume === 0) {
       current.fadeOutAndPause(this.fadeMs);
@@ -131,13 +150,33 @@ class MenuMusicPlayer {
 
   /** Start whatever should be playing right now, call it from a user gesture to bypass autoplay blocking. */
   public resume() {
-    if (this.targetUrl && this.targetVolume > 0) {
+    if (this.targetUrl && this.targetVolume > 0 && !this.ducked) {
       this.play(this.getDecks()[0]);
     }
   }
 
   public stop() {
     this.setTarget(null, 0);
+  }
+
+  /** Quickly fades the music out and pauses it (keeping the position) for an interface sound. */
+  public duck(fadeMs: number) {
+    if (this.ducked) return;
+    this.ducked = true;
+
+    for (const deck of this.getDecks()) {
+      if (!deck.audio.paused) deck.fadeOutAndPause(fadeMs);
+    }
+  }
+
+  /** Fades the music back in where it was paused, or starts the track queued while ducked. */
+  public unduck(fadeMs: number) {
+    if (!this.ducked) return;
+    this.ducked = false;
+
+    if (this.targetUrl && this.targetVolume > 0) {
+      this.play(this.getDecks()[0], fadeMs);
+    }
   }
 
   /** `[active, inactive]` */
@@ -161,7 +200,16 @@ class MenuMusicPlayer {
     audio.loop = !crossfade;
 
     const [current, other] = this.getDecks();
-    if (!crossfade || deck !== current || audio.paused || !this.targetUrl || deck.url !== this.targetUrl) return;
+    if (
+      !crossfade ||
+      this.ducked ||
+      deck !== current ||
+      audio.paused ||
+      !this.targetUrl ||
+      deck.url !== this.targetUrl
+    ) {
+      return;
+    }
 
     const remaining = audio.duration - audio.currentTime;
     if (remaining > fadeSeconds) return;
@@ -180,15 +228,15 @@ class MenuMusicPlayer {
 
   /** Safety net if the end was reached before the crossfade could start (e.g. a throttled background tab). */
   private restartEnded(deck: Deck) {
-    if (deck !== this.getDecks()[0] || !this.targetUrl || deck.url !== this.targetUrl) return;
+    if (this.ducked || deck !== this.getDecks()[0] || !this.targetUrl || deck.url !== this.targetUrl) return;
 
     deck.audio.currentTime = 0;
     this.play(deck);
   }
 
-  private play(deck: Deck) {
+  private play(deck: Deck, fadeMs = this.fadeMs) {
     if (!deck.audio.paused) {
-      deck.fadeTo(this.targetVolume, this.fadeMs);
+      deck.fadeTo(this.targetVolume, fadeMs);
       return;
     }
 
@@ -197,9 +245,14 @@ class MenuMusicPlayer {
     deck.audio
       .play()
       .then(() => {
-        if (deck !== this.getDecks()[0] || !this.targetUrl) return;
         this.stopWaitingForUnlock();
-        deck.fadeTo(this.targetVolume, this.fadeMs);
+        // a sound started while this was still loading, wait for `unduck`
+        if (this.ducked) {
+          deck.audio.pause();
+          return;
+        }
+        if (deck !== this.getDecks()[0] || !this.targetUrl) return;
+        deck.fadeTo(this.targetVolume, fadeMs);
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'NotAllowedError') {

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 mod routes;
 mod settings;
+mod sounds;
 
 #[derive(Default)]
 pub struct ExtensionStruct;

@@ -1,20 +1,14 @@
-import { faPlay, faRotateLeft, faStop, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faRotateLeft, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { FileButton, Slider, Text } from '@mantine/core';
-import { useState } from 'react';
-import { httpErrorToHuman } from '@/api/axios.ts';
 import Button from '@/elements/buttons/Button.tsx';
 import Card from '@/elements/data-display/Card.tsx';
-import Autocomplete from '@/elements/input/Autocomplete.tsx';
 import TextInput from '@/elements/input/TextInput.tsx';
 import Group from '@/elements/layout/Group.tsx';
 import SegmentedControl from '@/elements/layout/SegmentedControl.tsx';
 import Stack from '@/elements/layout/Stack.tsx';
-import { useToast } from '@/providers/ToastProvider.tsx';
-import uploadTrack from '../api/uploadTrack.ts';
-import { setPreview, usePreview } from '../lib/preview.ts';
 import { DEFAULT_PAGE, isCustomPage, type PlayMode, playModeSchema, type TrackConfig } from '../lib/schemas.ts';
 import { useExtTranslations } from '../translations.ts';
+import AudioSourceFields from './AudioSourceFields.tsx';
 import PageHeading from './PageHeading.tsx';
 
 interface Props {
@@ -29,32 +23,8 @@ interface Props {
 
 export default function TrackEditor({ track, errors, assetUrls, canUpload, onChange, onRemove, onUploaded }: Props) {
   const { t: tExt } = useExtTranslations();
-  const { addToast } = useToast();
-  const preview = usePreview();
-
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-
   const isDefault = track.page === DEFAULT_PAGE;
   const isCustom = isCustomPage(track.page);
-  const previewing = preview !== null && preview.url === track.url;
-
-  const doUpload = (file: File | null) => {
-    if (!file) return;
-
-    setUploadProgress(0);
-    uploadTrack(file, setUploadProgress)
-      .then((url) => {
-        onChange({ ...track, url });
-        onUploaded();
-        addToast(tExt('config.uploaded', { name: file.name }), 'success');
-      })
-      .catch((err) => addToast(httpErrorToHuman(err), 'error'))
-      .finally(() => setUploadProgress(null));
-  };
-
-  const togglePreview = () => {
-    setPreview(previewing || !track.url ? null : { url: track.url, volume: track.volume / 100 });
-  };
 
   return (
     <Card withBorder radius='md' p='md' className='@container h-full'>
@@ -106,61 +76,19 @@ export default function TrackEditor({ track, errors, assetUrls, canUpload, onCha
         />
 
         {track.mode !== 'off' && (
-          <>
-            <Group align='flex-end' gap='xs'>
-              <Autocomplete
-                className='flex-1 min-w-56'
-                label={tExt('config.tracks.url', {})}
-                placeholder={tExt('config.tracks.urlPlaceholder', {})}
-                description={tExt('config.tracks.urlDescription', {})}
-                data={assetUrls}
-                value={track.url}
-                onChange={(url) => onChange({ ...track, url })}
-                error={errors.url}
-                limit={50}
-                maxDropdownHeight={240}
-              />
-              {canUpload && (
-                <FileButton onChange={doUpload} accept='audio/*'>
-                  {(props) => (
-                    <Button
-                      {...props}
-                      variant='default'
-                      loading={uploadProgress !== null}
-                      leftSection={<FontAwesomeIcon icon={faUpload} />}
-                    >
-                      {tExt('config.tracks.upload', {})}
-                    </Button>
-                  )}
-                </FileButton>
-              )}
-              <Button
-                variant='default'
-                disabled={!track.url}
-                onClick={togglePreview}
-                leftSection={<FontAwesomeIcon icon={previewing ? faStop : faPlay} />}
-              >
-                {previewing ? tExt('config.tracks.stopPreview', {}) : tExt('config.tracks.preview', {})}
-              </Button>
-            </Group>
-
-            <div>
-              <Text size='sm' fw={500} mb={4}>
-                {tExt('config.tracks.volume', {})}
-              </Text>
-              <Slider
-                value={track.volume}
-                onChange={(volume) => {
-                  onChange({ ...track, volume });
-                  if (previewing) setPreview({ url: track.url, volume: volume / 100 });
-                }}
-                min={0}
-                max={100}
-                step={1}
-                label={(value) => `${value}%`}
-              />
-            </div>
-          </>
+          <AudioSourceFields
+            url={track.url}
+            volume={track.volume}
+            urlError={errors.url}
+            urlLabel={tExt('config.tracks.url', {})}
+            urlDescription={tExt('config.tracks.urlDescription', {})}
+            volumeLabel={tExt('config.tracks.volume', {})}
+            assetUrls={assetUrls}
+            canUpload={canUpload}
+            previewMode='music'
+            onChange={(change) => onChange({ ...track, ...change })}
+            onUploaded={onUploaded}
+          />
         )}
       </Stack>
     </Card>

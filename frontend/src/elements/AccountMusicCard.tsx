@@ -16,13 +16,17 @@ import { useExtTranslations } from '../translations.ts';
 export default function AccountMusicCard({ requireTwoFactorActivation }: AccountCardProps) {
   const { t: tExt } = useExtTranslations();
   const { data: config } = useMenuMusicConfig();
-  const { muted, volume, setMuted, setVolume } = useMusicPrefs(config?.defaultVolume ?? 50);
+  const { muted, volume, soundsMuted, setMuted, setVolume, setSoundsMuted } = useMusicPrefs(
+    config?.defaultVolume ?? 50,
+  );
 
   // only sync the slider once it is released, the setting is persisted to the account
   const [sliderVolume, setSliderVolume] = useState(volume);
   useEffect(() => setSliderVolume(volume), [volume]);
 
   if (!config) return null;
+
+  const hasSounds = config.sounds.some((sound) => sound.enabled && sound.url);
 
   return (
     <TitleCard
@@ -42,6 +46,14 @@ export default function AccountMusicCard({ requireTwoFactorActivation }: Account
                 if (e.target.checked) player.resume();
               }}
             />
+            {hasSounds && (
+              <Switch
+                label={tExt('account.sounds', {})}
+                description={tExt('account.soundsDescription', {})}
+                checked={!soundsMuted}
+                onChange={(e) => setSoundsMuted(!e.target.checked)}
+              />
+            )}
             <div>
               <Text size='sm' fw={500} mb={4}>
                 {tExt('account.volume', {})}
@@ -54,7 +66,7 @@ export default function AccountMusicCard({ requireTwoFactorActivation }: Account
                 max={100}
                 step={1}
                 label={(value) => `${value}%`}
-                disabled={muted}
+                disabled={muted && (soundsMuted || !hasSounds)}
               />
             </div>
           </>

@@ -6,6 +6,8 @@ use shared::extensions::settings::{
 };
 use utoipa::ToSchema;
 
+use crate::sounds::{self, DEFAULT_SOUND_FADE_MS, SoundConfig};
+
 /// The page key of the fallback track, used for every page that has no track of its own.
 pub const DEFAULT_PAGE: &str = "default";
 
@@ -86,6 +88,10 @@ pub struct ExtensionSettingsData {
     pub fade_duration_ms: u32,
     /// Volume in percent users start with before they pick their own.
     pub default_volume: u8,
+    /// Interface sounds played on button presses, checkbox toggles and select menus.
+    pub sounds: Vec<SoundConfig>,
+    /// How fast the music fades out before and back in after an interface sound.
+    pub sound_fade_ms: u32,
 }
 
 impl Default for ExtensionSettingsData {
@@ -96,6 +102,8 @@ impl Default for ExtensionSettingsData {
             idle_timeout_seconds: 60,
             fade_duration_ms: 1500,
             default_volume: 50,
+            sounds: Vec::new(),
+            sound_fade_ms: DEFAULT_SOUND_FADE_MS,
         }
     }
 }
@@ -172,6 +180,8 @@ impl ExtensionSettingsData {
             errors.push("default_volume: must be between 0 and 100".to_string());
         }
 
+        errors.extend(sounds::validate(&self.sounds, self.sound_fade_ms));
+
         errors
     }
 
@@ -210,6 +220,8 @@ impl ExtensionSettingsData {
         self.idle_timeout_seconds = self.idle_timeout_seconds.clamp(1, MAX_IDLE_TIMEOUT_SECONDS);
         self.fade_duration_ms = self.fade_duration_ms.min(MAX_FADE_DURATION_MS);
         self.default_volume = self.default_volume.min(100);
+        self.sounds = sounds::normalize(std::mem::take(&mut self.sounds));
+        self.sound_fade_ms = self.sound_fade_ms.min(MAX_FADE_DURATION_MS);
     }
 }
 
@@ -226,13 +238,13 @@ fn is_custom_page(page: &str) -> bool {
     })
 }
 
-fn is_valid_path_pattern(path: &str) -> bool {
+pub(crate) fn is_valid_path_pattern(path: &str) -> bool {
     path.starts_with('/')
         && path.len() <= MAX_CUSTOM_PATH_LENGTH
         && !path.chars().any(|c| c.is_whitespace() || c.is_control())
 }
 
-fn is_allowed_url(url: &str) -> bool {
+pub(crate) fn is_allowed_url(url: &str) -> bool {
     url.is_empty()
         || url.starts_with("https://")
         || url.starts_with("http://")
@@ -256,7 +268,9 @@ impl SettingsSerializeExt for ExtensionSettingsData {
                 "fade_duration_ms",
                 self.fade_duration_ms.to_compact_string(),
             )
-            .write_raw_setting("default_volume", self.default_volume.to_compact_string()))
+            .write_raw_setting("default_volume", self.default_volume.to_compact_string())
+            .write_serde_setting("sounds", &self.sounds)?
+            .write_raw_setting("sound_fade_ms", self.sound_fade_ms.to_compact_string()))
     }
 }
 
@@ -290,6 +304,13 @@ impl SettingsDeserializeExt for ExtensionSettingsDataDeserializer {
                 .take_raw_setting("default_volume")
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(defaults.default_volume),
+            sounds: deserializer
+                .read_serde_setting("sounds")
+                .unwrap_or(defaults.sounds),
+            sound_fade_ms: deserializer
+                .take_raw_setting("sound_fade_ms")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(defaults.sound_fade_ms),
         };
         data.normalize();
 
