@@ -3,16 +3,19 @@ import {
   faGear,
   faLink,
   faListUl,
+  faMusic,
   faPlus,
   faRoute,
+  faSliders,
   faVolumeHigh,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Text } from '@mantine/core';
+import { Badge, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useQueryClient } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { httpErrorToHuman } from '@/api/axios.ts';
 import Button from '@/elements/buttons/Button.tsx';
 import Card from '@/elements/data-display/Card.tsx';
@@ -22,6 +25,7 @@ import Switch from '@/elements/input/Switch.tsx';
 import TextInput from '@/elements/input/TextInput.tsx';
 import Group from '@/elements/layout/Group.tsx';
 import Stack from '@/elements/layout/Stack.tsx';
+import Tabs from '@/elements/layout/Tabs.tsx';
 import { useKeyboardShortcut } from '@/plugins/quick-actions/useKeyboardShortcuts.ts';
 import { useResource } from '@/plugins/resource/useResource.ts';
 import { useAdminCan } from '@/plugins/usePermissions.ts';
@@ -63,6 +67,19 @@ function sortTracks(tracks: TrackConfig[]): TrackConfig[] {
   return [...tracks].sort((a, b) => order(a.page) - order(b.page));
 }
 
+type Tab = 'music' | 'sounds';
+
+const SOUND_FIELDS = ['sounds', 'soundFadeMs'];
+const MUSIC_FIELDS = ['tracks', 'idleTimeoutSeconds', 'fadeDurationMs'];
+
+function hasErrorIn(errors: Record<string, unknown>, fields: string[]): boolean {
+  return Object.keys(errors).some((path) => fields.some((field) => path === field || path.startsWith(`${field}.`)));
+}
+
+function ErrorDot() {
+  return <span className='inline-block h-2 w-2 rounded-full bg-(--mantine-color-error)' />;
+}
+
 const emptyConfig: MenuMusicConfig = {
   enabled: true,
   tracks: [{ page: DEFAULT_PAGE, name: '', path: '', mode: 'always', url: '', volume: 100 }],
@@ -82,6 +99,20 @@ export default function ConfigurationPage() {
   const canUploadAssets = useAdminCan('assets.upload');
 
   const [loading, setLoading] = useState(false);
+
+  // the open tab lives in the URL (?tab=sounds), so reloads and shared links keep it
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: Tab = searchParams.get('tab') === 'sounds' ? 'sounds' : 'music';
+  const setTab = (next: Tab) =>
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next === 'sounds') params.set('tab', 'sounds');
+        else params.delete('tab');
+        return params;
+      },
+      { replace: true },
+    );
   const [customName, setCustomName] = useState('');
   const [customPath, setCustomPath] = useState('');
 
@@ -190,6 +221,18 @@ export default function ConfigurationPage() {
     };
   };
 
+  const musicHasErrors = hasErrorIn(form.errors, MUSIC_FIELDS);
+  const soundsHaveErrors = hasErrorIn(form.errors, SOUND_FIELDS);
+
+  // show the problem when saving fails on a field of the other tab
+  const onInvalid = (errors: Record<string, unknown>) => {
+    if (hasErrorIn(errors, MUSIC_FIELDS)) {
+      if (tab !== 'music') setTab('music');
+    } else if (hasErrorIn(errors, SOUND_FIELDS) && tab !== 'sounds') {
+      setTab('sounds');
+    }
+  };
+
   const doSave = () => {
     setLoading(true);
 
@@ -206,7 +249,7 @@ export default function ConfigurationPage() {
   };
 
   return (
-    <form ref={formRef} onSubmit={form.onSubmit(doSave)}>
+    <form ref={formRef} onSubmit={form.onSubmit(doSave, onInvalid)}>
       <Stack>
         <Group justify='flex-end'>
           <Button
@@ -227,23 +270,6 @@ export default function ConfigurationPage() {
               {...form.getInputProps('enabled', { type: 'checkbox' })}
             />
             <NumberInput
-              label={tExt('config.general.idleTimeout', {})}
-              description={tExt('config.general.idleTimeoutDescription', {})}
-              min={1}
-              max={86400}
-              allowDecimal={false}
-              {...form.getInputProps('idleTimeoutSeconds')}
-            />
-            <NumberInput
-              label={tExt('config.general.fadeDuration', {})}
-              description={tExt('config.general.fadeDurationDescription', {})}
-              min={0}
-              max={30000}
-              step={100}
-              allowDecimal={false}
-              {...form.getInputProps('fadeDurationMs')}
-            />
-            <NumberInput
               label={tExt('config.general.defaultVolume', {})}
               description={tExt('config.general.defaultVolumeDescription', {})}
               min={0}
@@ -252,169 +278,220 @@ export default function ConfigurationPage() {
               allowDecimal={false}
               {...form.getInputProps('defaultVolume')}
             />
-            <NumberInput
-              label={tExt('config.general.soundFade', {})}
-              description={tExt('config.general.soundFadeDescription', {})}
-              min={0}
-              max={30000}
-              step={50}
-              allowDecimal={false}
-              {...form.getInputProps('soundFadeMs')}
-            />
           </div>
         </TitleCard>
 
-        <div className='grid grid-cols-1 xl:grid-cols-3 gap-4 items-start'>
-          <TitleCard
-            className='xl:col-span-2'
-            title={tExt('config.tracks.configured', {})}
-            icon={<FontAwesomeIcon icon={faListUl} />}
-          >
+        <Tabs value={tab} onChange={(value) => setTab(value === 'sounds' ? 'sounds' : 'music')}>
+          <Tabs.List>
+            <Tabs.Tab
+              value='music'
+              leftSection={<FontAwesomeIcon icon={faMusic} />}
+              rightSection={musicHasErrors ? <ErrorDot /> : undefined}
+            >
+              {tExt('config.tabs.music', {})}
+            </Tabs.Tab>
+            <Tabs.Tab
+              value='sounds'
+              leftSection={<FontAwesomeIcon icon={faVolumeHigh} />}
+              rightSection={
+                soundsHaveErrors ? (
+                  <ErrorDot />
+                ) : form.values.sounds.length > 0 ? (
+                  <Badge size='sm' variant='light' circle>
+                    {form.values.sounds.length}
+                  </Badge>
+                ) : undefined
+              }
+            >
+              {tExt('config.tabs.sounds', {})}
+            </Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value='music' pt='md'>
             <Stack>
-              <Text size='sm' c='dimmed'>
-                {tExt('config.tracks.configuredDescription', {})}
-              </Text>
-              {/* two columns once the card itself is wide enough, whatever the window size */}
-              <div className='@container'>
-                <div className='grid grid-cols-1 @4xl:grid-cols-2 gap-4'>
-                  {tracks.map((track, index) => (
-                    <TrackEditor
-                      key={track.page}
-                      track={track}
-                      errors={{
-                        name: form.errors[`tracks.${index}.name`] as string | undefined,
-                        path: form.errors[`tracks.${index}.path`] as string | undefined,
-                        url: form.errors[`tracks.${index}.url`] as string | undefined,
-                      }}
-                      assetUrls={assetUrls}
-                      canUpload={canUploadAssets}
-                      onChange={(next) => form.setFieldValue(`tracks.${index}`, next)}
-                      onRemove={() => removePage(track.page)}
-                      onUploaded={() => assets.invalidate()}
-                    />
-                  ))}
+              <TitleCard title={tExt('config.music.title', {})} icon={<FontAwesomeIcon icon={faSliders} />}>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  <NumberInput
+                    label={tExt('config.general.idleTimeout', {})}
+                    description={tExt('config.general.idleTimeoutDescription', {})}
+                    min={1}
+                    max={86400}
+                    allowDecimal={false}
+                    {...form.getInputProps('idleTimeoutSeconds')}
+                  />
+                  <NumberInput
+                    label={tExt('config.general.fadeDuration', {})}
+                    description={tExt('config.general.fadeDurationDescription', {})}
+                    min={0}
+                    max={30000}
+                    step={100}
+                    allowDecimal={false}
+                    {...form.getInputProps('fadeDurationMs')}
+                  />
                 </div>
+              </TitleCard>
+
+              <div className='grid grid-cols-1 xl:grid-cols-3 gap-4 items-start'>
+                <TitleCard
+                  className='xl:col-span-2'
+                  title={tExt('config.tracks.configured', {})}
+                  icon={<FontAwesomeIcon icon={faListUl} />}
+                >
+                  <Stack>
+                    <Text size='sm' c='dimmed'>
+                      {tExt('config.tracks.configuredDescription', {})}
+                    </Text>
+                    {/* two columns once the card itself is wide enough, whatever the window size */}
+                    <div className='@container'>
+                      <div className='grid grid-cols-1 @4xl:grid-cols-2 gap-4'>
+                        {tracks.map((track, index) => (
+                          <TrackEditor
+                            key={track.page}
+                            track={track}
+                            errors={{
+                              name: form.errors[`tracks.${index}.name`] as string | undefined,
+                              path: form.errors[`tracks.${index}.path`] as string | undefined,
+                              url: form.errors[`tracks.${index}.url`] as string | undefined,
+                            }}
+                            assetUrls={assetUrls}
+                            canUpload={canUploadAssets}
+                            onChange={(next) => form.setFieldValue(`tracks.${index}`, next)}
+                            onRemove={() => removePage(track.page)}
+                            onUploaded={() => assets.invalidate()}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </Stack>
+                </TitleCard>
+
+                <Stack>
+                  <TitleCard title={tExt('config.tracks.available', {})} icon={<FontAwesomeIcon icon={faRoute} />}>
+                    <Stack gap='sm'>
+                      <Text size='sm' c='dimmed'>
+                        {tExt('config.tracks.availableDescription', {})}
+                      </Text>
+                      {unconfiguredPages.length === 0 && (
+                        <Text size='sm' fs='italic'>
+                          {tExt('config.tracks.allConfigured', {})}
+                        </Text>
+                      )}
+                      {unconfiguredPages.map((page) => (
+                        <Card key={page} withBorder radius='md' p='sm'>
+                          <Group justify='space-between' align='flex-start' wrap='nowrap'>
+                            <PageHeading page={page} name='' path='' />
+                            <Button
+                              size='xs'
+                              variant='light'
+                              className='shrink-0'
+                              leftSection={<FontAwesomeIcon icon={faPlus} />}
+                              onClick={() => addTrack(page)}
+                            >
+                              {tExt('config.tracks.add', {})}
+                            </Button>
+                          </Group>
+                        </Card>
+                      ))}
+                    </Stack>
+                  </TitleCard>
+
+                  <TitleCard title={tExt('config.custom.title', {})} icon={<FontAwesomeIcon icon={faLink} />}>
+                    <Stack gap='sm'>
+                      <Text size='sm' c='dimmed'>
+                        {tExt('config.custom.description', {})}
+                      </Text>
+                      <TextInput
+                        label={tExt('config.custom.name', {})}
+                        placeholder={tExt('config.custom.namePlaceholder', {})}
+                        value={customName}
+                        onChange={(e) => setCustomName(e.currentTarget.value)}
+                        maxLength={MAX_CUSTOM_NAME_LENGTH}
+                      />
+                      <TextInput
+                        label={tExt('config.custom.path', {})}
+                        placeholder={tExt('config.custom.pathPlaceholder', {})}
+                        value={customPath}
+                        onChange={(e) => setCustomPath(e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          // Enter adds the page instead of submitting the whole settings form
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addCustomPage();
+                          }
+                        }}
+                        maxLength={MAX_CUSTOM_PATH_LENGTH}
+                        classNames={{ input: 'font-mono' }}
+                      />
+                      <Button
+                        variant='light'
+                        disabled={!customValid}
+                        leftSection={<FontAwesomeIcon icon={faPlus} />}
+                        onClick={addCustomPage}
+                        className='w-fit!'
+                      >
+                        {tExt('config.custom.add', {})}
+                      </Button>
+                    </Stack>
+                  </TitleCard>
+                </Stack>
               </div>
             </Stack>
-          </TitleCard>
+          </Tabs.Panel>
 
-          <Stack>
-            <TitleCard title={tExt('config.tracks.available', {})} icon={<FontAwesomeIcon icon={faRoute} />}>
-              <Stack gap='sm'>
+          <Tabs.Panel value='sounds' pt='md'>
+            <TitleCard title={tExt('config.sounds.title', {})} icon={<FontAwesomeIcon icon={faVolumeHigh} />}>
+              <Stack>
                 <Text size='sm' c='dimmed'>
-                  {tExt('config.tracks.availableDescription', {})}
+                  {tExt('config.sounds.description', {})}
                 </Text>
-                {unconfiguredPages.length === 0 && (
+                <Group justify='space-between' align='flex-end'>
+                  <NumberInput
+                    className='w-full max-w-md'
+                    label={tExt('config.general.soundFade', {})}
+                    description={tExt('config.general.soundFadeDescription', {})}
+                    min={0}
+                    max={30000}
+                    step={50}
+                    allowDecimal={false}
+                    {...form.getInputProps('soundFadeMs')}
+                  />
+                  <Button variant='light' leftSection={<FontAwesomeIcon icon={faPlus} />} onClick={addSound}>
+                    {tExt('config.sounds.add', {})}
+                  </Button>
+                </Group>
+
+                {form.values.sounds.length === 0 && (
                   <Text size='sm' fs='italic'>
-                    {tExt('config.tracks.allConfigured', {})}
+                    {tExt('config.sounds.none', {})}
                   </Text>
                 )}
-                {unconfiguredPages.map((page) => (
-                  <Card key={page} withBorder radius='md' p='sm'>
-                    <Group justify='space-between' align='flex-start' wrap='nowrap'>
-                      <PageHeading page={page} name='' path='' />
-                      <Button
-                        size='xs'
-                        variant='light'
-                        className='shrink-0'
-                        leftSection={<FontAwesomeIcon icon={faPlus} />}
-                        onClick={() => addTrack(page)}
-                      >
-                        {tExt('config.tracks.add', {})}
-                      </Button>
-                    </Group>
-                  </Card>
-                ))}
+
+                <div className='@container'>
+                  <div className='grid grid-cols-1 @4xl:grid-cols-2 @6xl:grid-cols-3 gap-4'>
+                    {form.values.sounds.map((sound, index) => (
+                      <SoundEditor
+                        key={sound.id}
+                        sound={sound}
+                        errors={soundErrors(index)}
+                        defaultFadeMs={form.values.soundFadeMs}
+                        assetUrls={assetUrls}
+                        canUpload={canUploadAssets}
+                        onChange={(next) => form.setFieldValue(`sounds.${index}`, next)}
+                        onRemove={() =>
+                          form.setFieldValue(
+                            'sounds',
+                            form.values.sounds.filter((s) => s.id !== sound.id),
+                          )
+                        }
+                        onUploaded={() => assets.invalidate()}
+                      />
+                    ))}
+                  </div>
+                </div>
               </Stack>
             </TitleCard>
-
-            <TitleCard title={tExt('config.custom.title', {})} icon={<FontAwesomeIcon icon={faLink} />}>
-              <Stack gap='sm'>
-                <Text size='sm' c='dimmed'>
-                  {tExt('config.custom.description', {})}
-                </Text>
-                <TextInput
-                  label={tExt('config.custom.name', {})}
-                  placeholder={tExt('config.custom.namePlaceholder', {})}
-                  value={customName}
-                  onChange={(e) => setCustomName(e.currentTarget.value)}
-                  maxLength={MAX_CUSTOM_NAME_LENGTH}
-                />
-                <TextInput
-                  label={tExt('config.custom.path', {})}
-                  placeholder={tExt('config.custom.pathPlaceholder', {})}
-                  value={customPath}
-                  onChange={(e) => setCustomPath(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    // Enter adds the page instead of submitting the whole settings form
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addCustomPage();
-                    }
-                  }}
-                  maxLength={MAX_CUSTOM_PATH_LENGTH}
-                  classNames={{ input: 'font-mono' }}
-                />
-                <Button
-                  variant='light'
-                  disabled={!customValid}
-                  leftSection={<FontAwesomeIcon icon={faPlus} />}
-                  onClick={addCustomPage}
-                  className='w-fit!'
-                >
-                  {tExt('config.custom.add', {})}
-                </Button>
-              </Stack>
-            </TitleCard>
-          </Stack>
-        </div>
-
-        <TitleCard title={tExt('config.sounds.title', {})} icon={<FontAwesomeIcon icon={faVolumeHigh} />}>
-          <Stack>
-            <Group justify='space-between' align='flex-start' wrap='nowrap'>
-              <Text size='sm' c='dimmed'>
-                {tExt('config.sounds.description', {})}
-              </Text>
-              <Button
-                variant='light'
-                className='shrink-0'
-                leftSection={<FontAwesomeIcon icon={faPlus} />}
-                onClick={addSound}
-              >
-                {tExt('config.sounds.add', {})}
-              </Button>
-            </Group>
-
-            {form.values.sounds.length === 0 && (
-              <Text size='sm' fs='italic'>
-                {tExt('config.sounds.none', {})}
-              </Text>
-            )}
-
-            <div className='@container'>
-              <div className='grid grid-cols-1 @4xl:grid-cols-2 gap-4'>
-                {form.values.sounds.map((sound, index) => (
-                  <SoundEditor
-                    key={sound.id}
-                    sound={sound}
-                    errors={soundErrors(index)}
-                    defaultFadeMs={form.values.soundFadeMs}
-                    assetUrls={assetUrls}
-                    canUpload={canUploadAssets}
-                    onChange={(next) => form.setFieldValue(`sounds.${index}`, next)}
-                    onRemove={() =>
-                      form.setFieldValue(
-                        'sounds',
-                        form.values.sounds.filter((s) => s.id !== sound.id),
-                      )
-                    }
-                    onUploaded={() => assets.invalidate()}
-                  />
-                ))}
-              </div>
-            </div>
-          </Stack>
-        </TitleCard>
+          </Tabs.Panel>
+        </Tabs>
       </Stack>
     </form>
   );

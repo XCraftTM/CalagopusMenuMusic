@@ -44,14 +44,15 @@ const translations = defineTranslations({
       general: {
         title: 'General',
         enabled: 'Enable menu music',
-        enabledDescription: 'Master switch for the whole extension. When off, no page plays music.',
+        enabledDescription: 'Master switch for the whole extension. When off, no page plays music or interface sounds.',
         idleTimeout: 'Idle delay (seconds)',
         idleTimeoutDescription: 'How long a user has to be inactive before tracks set to "Play when idle" start.',
         fadeDuration: 'Crossfade duration (ms)',
         fadeDurationDescription:
           'When you switch to a page with a different track, the old track fades out while the new one fades in over this time. A track that reaches its end also crossfades into its own beginning, and music fades in and out over this time when it starts or stops.',
         defaultVolume: 'Default user volume',
-        defaultVolumeDescription: 'Volume users start with until they pick their own on the account page.',
+        defaultVolumeDescription:
+          'Volume for music and interface sounds that users start with until they pick their own on the account page.',
         soundFade: 'Interface sound fade (ms)',
         soundFadeDescription:
           'When an interface sound plays, the music fades out over this time and pauses, then fades back in from the same spot once the sound has finished. Sounds can override it.',
@@ -85,6 +86,13 @@ const translations = defineTranslations({
         pathPlaceholder: '/server/*/files*',
         add: 'Add custom page',
         untitled: 'Untitled page',
+      },
+      tabs: {
+        music: 'Background Music',
+        sounds: 'Interface Sounds',
+      },
+      music: {
+        title: 'Music Settings',
       },
       sounds: {
         title: 'Interface Sounds',

@@ -22,21 +22,24 @@ A [Calagopus Panel](https://calagopus.com) extension (`dev.xcrafttm.menumusic`) 
 
 ## Configuration page
 
+**Save** sits at the top of the page. Like the panel's own settings pages, **Ctrl+S** (**Cmd+S** on macOS) saves too, or whatever the user bound *Save* to under **Account → Shortcuts**.
+
+Below it, the **General** card holds the master on/off switch and the volume new users start with. Both apply to music and interface sounds.
+
+The rest is split into two tabs. The open tab is kept in the URL (`?tab=sounds`), so reloads and shared links keep it. If saving fails because of a field on the other tab, the page switches to that tab, and tabs with errors are marked.
+
+**Background Music**
+
+- **Music Settings**: the idle delay (for tracks set to *Play when idle*) and the crossfade duration.
+
 | Left: **Configured** | Right: **Using Default Track** |
 | --- | --- |
 | The **Default** track is always first. Below it are the pages you gave their own track, each with playback mode, URL (asset autocomplete, upload, preview) and volume. They are shown in two columns when there is room. **Use default** moves a built-in page back to the right, and **Remove** deletes a custom page. | Every built-in page without its own track. These pages play the Default track. **Add** moves a page to the left so you can configure it. Below the list, **Add Custom Page** creates a page from a name and a URL pattern. |
 
-**Save** sits at the top of the page. Like the panel's own settings pages, **Ctrl+S** (**Cmd+S** on macOS) saves too, or whatever the user bound *Save* to under **Account → Shortcuts**.
+**Interface Sounds**
 
-General options:
-
-- master on/off switch
-- idle delay in seconds, used by tracks set to *Play when idle*
-- crossfade duration
-- the volume new users start with
-- interface sound fade
-
-Below the page tracks, **Interface Sounds** lists the sounds, each with its trigger, targets, page, sound file (asset autocomplete, upload, preview), volume and optional fade override.
+- The interface sound fade and **Add sound**.
+- The sound cards, in up to three columns depending on the available width. Each card has its trigger, targets, page, sound file (asset autocomplete, upload, preview), volume and optional fade override.
 
 ## Installing
 
